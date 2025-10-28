@@ -59,7 +59,7 @@ class HipMRIDataset(Dataset):
         return image, mask
 
 # Helper function to create train/val/test datasets
-def get_datasets(base_path="keras_slices_data"):
+def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
     """
     Prepares train/val/test datasets using the actual folder names
     in kera_slices_data.
