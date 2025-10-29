@@ -76,7 +76,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
     # Add learning rate scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='max', factor=0.5, patience=3, verbose=True)
+    optimizer, mode='min', factor=0.5, patience=3)
 
     # Initial summary
     _, params = param_check(model)
@@ -118,8 +118,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
         # Step scheduler based on validation Dice
         scheduler.step(avg_val_dice)
-
-
+        print(f"Epoch {epoch+1} — Current LR: {optimizer.param_groups[0]['lr']:.6f}")
         # Save checkpoint if validation improves
         if avg_val_dice > best_val_dice:
             best_val_dice = avg_val_dice
