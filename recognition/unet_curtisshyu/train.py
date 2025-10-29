@@ -98,7 +98,6 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
         avg_train_loss = train_loss / len(train_loader)
         
-
         # Validation
         model.eval()
         with torch.no_grad():
@@ -121,11 +120,42 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
             torch.save(model.state_dict(), save_path)
             print(f"New best model saved with Dice: {best_val_dice:.4f}")
 
-    plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png")
+    #plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png")
     print("Training loop successfully completed.")
     return model
 
+def test_model(checkpoint_path,
+               batch_size):
+    """
+    Loads the best saved U-Net model and evaluates it on the unseen test set.
+    Computes the overall Dice coefficient to measure generalization.
+    """
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Evaluating on device: {device}")
+
+    # Load the test set only
+    _, _, test_set = get_datasets()
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size)
+
+    # Load best model weights
+    model = UNet(n_channels=1, n_classes=1).to(device)
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    model.eval()
+
+    dice_scores = []
+    with torch.no_grad():
+        for imgs, masks in test_loader:
+            imgs, masks = imgs.to(device), masks.to(device)
+            outputs = model(imgs)
+            dice = dice_coefficient(outputs, masks)
+            dice_scores.append(dice.item())
+
+    avg_dice = sum(dice_scores) / len(dice_scores)
+    print(f"\nTest Dice Coefficient on unseen test set: {avg_dice:.4f}")
+    return avg_dice
 
 
 if __name__ == "__main__":
     train_model(epochs=2, lr=1e-4, batch_size=2)
+    test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)   
