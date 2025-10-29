@@ -69,3 +69,7 @@ Compare to previous epochs.
 dataset.py
 - justify the transforms augmentation
 - mimic realsitic mri variablity
+- improve generalisation, and reduce overfitting
+- exploit symmetry in left-right anatomical symmetry
+- simulate minor slice orientaiton that occur during acuqistion
+- mimic small patient alignment or scanner rotation

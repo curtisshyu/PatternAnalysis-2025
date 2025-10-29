@@ -90,7 +90,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = 0.5 * bce_loss(outputs, masks) + 0.5 * dice_loss(outputs, masks)
+            loss = 0.3 * bce_loss(outputs, masks) + 0.7 * dice_loss(outputs, masks)
             loss.backward()
             optimizer.step()
 
@@ -157,5 +157,5 @@ def test_model(checkpoint_path,
 
 
 if __name__ == "__main__":
-    train_model(epochs=50, lr=1e-4, batch_size=4)
+    train_model(epochs=50, lr=5e-4, batch_size=4)
     test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)   
