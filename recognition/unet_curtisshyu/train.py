@@ -74,6 +74,10 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
     bce_loss = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    # Add learning rate scheduler
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode='max', factor=0.5, patience=3, verbose=True)
+
     # Initial summary
     _, params = param_check(model)
     print(f"Model initialized with {params:,} trainable parameters")
@@ -111,6 +115,9 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
         print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
         train_losses.append(avg_train_loss)
         val_dices.append(avg_val_dice)
+
+        # Step scheduler based on validation Dice
+        scheduler.step(avg_val_dice)
 
 
         # Save checkpoint if validation improves
@@ -157,5 +164,5 @@ def test_model(checkpoint_path,
 
 
 if __name__ == "__main__":
-    train_model(epochs=50, lr=5e-4, batch_size=4)
+    train_model(epochs=75, lr=5e-4, batch_size=4)
     test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)   

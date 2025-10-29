@@ -65,6 +65,12 @@ Freeze the model.
 Run it on the validation data.
 Compute metrics (e.g. Dice score).
 Compare to previous epochs.
+## Scheduler
+- Montiors validation, if it does not improve for 3 pochs, reduces lr by a fctor of 0.5
+Allows us to escape plateaus
+- mode = max monitors validation
+- factor is how much to reduce by
+- patience is count wihtout improvement to reduce
 
 dataset.py
 - justify the transforms augmentation
