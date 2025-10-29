@@ -11,12 +11,20 @@ class HipMRIDataset(Dataset):
     Loads 2D MRI slice images and corresponding segmentation masks 
     for prostate segmentation using the HipMRI dataset.
     """
-    def __init__(self, image_dir, mask_dir, transform=None, normalize=True, target_size=(128, 128)):
+    def __init__(self, image_dir, mask_dir, transform=None, normalize=True, target_size=(128, 128), augment = False):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.transform = transform
         self.normalize = normalize
         self.target_size = target_size
+        self.augment = augment
+        self.resize = transforms.Resize(self.target_size, antialias=True)
+
+        self.augmentations = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.3),
+            transforms.RandomRotation(degrees=15),
+        ])
 
         # Get matching filenames
         self.image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(('.nii', '.nii.gz'))])
@@ -25,7 +33,7 @@ class HipMRIDataset(Dataset):
         assert len(self.image_files) == len(self.mask_files), \
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
-        self.resize = transforms.Resize(self.target_size, antialias=True)
+        
 
     def __len__(self):
         return len(self.image_files)
@@ -61,6 +69,10 @@ class HipMRIDataset(Dataset):
                 image = self.transform(image)
                 mask = self.transform(mask)
 
+            if self.augment:
+                image = self.augmentations(image)
+                mask = self.augmentations(mask)
+
             return image, mask
 
 # Helper function to create train/val/test datasets
@@ -79,7 +91,7 @@ def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data")
     test_imgs = os.path.join(base_path, "keras_slices_test")
     test_masks = os.path.join(base_path, "keras_slices_seg_test")
 
-    train_set = HipMRIDataset(train_imgs, train_masks)
+    train_set = HipMRIDataset(train_imgs, train_masks, augment=True)
     val_set = HipMRIDataset(val_imgs, val_masks)
     test_set = HipMRIDataset(test_imgs, test_masks)
 

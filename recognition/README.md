@@ -55,3 +55,17 @@ Input MRI -> U-net -> output is comapred to ground truth mask - loss function me
 - defines binary corss entropy corss logits
 - optimises weights
 - performs forward/backward propogation
+## Validtion/Testing
+When we “implement validation” before training the full model, we’re not training on it — we’re simply setting up a diagnostic mechanism that tells us:
+If you only track training loss:
+You might see it go to near 0,
+But your model could fail miserably on new data → overfitting.
+The validation set acts as a checkpoint: it’s not used for gradient updates, but after each epoch we:
+Freeze the model.
+Run it on the validation data.
+Compute metrics (e.g. Dice score).
+Compare to previous epochs.
+
+dataset.py
+- justify the transforms augmentation
+- mimic realsitic mri variablity
