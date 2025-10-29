@@ -157,5 +157,5 @@ def test_model(checkpoint_path,
 
 
 if __name__ == "__main__":
-    train_model(epochs=2, lr=1e-4, batch_size=2)
+    train_model(epochs=50, lr=1e-4, batch_size=4)
     test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)   
