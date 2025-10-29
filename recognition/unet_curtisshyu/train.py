@@ -121,9 +121,10 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
             torch.save(model.state_dict(), save_path)
             print(f"New best model saved with Dice: {best_val_dice:.4f}")
 
-    plot_training_curves(train_losses, val_dices)
+    plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png")
     print("Training loop successfully completed.")
     return model
+
 
 
 if __name__ == "__main__":
