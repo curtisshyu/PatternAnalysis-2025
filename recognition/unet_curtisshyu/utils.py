@@ -36,28 +36,34 @@ def param_check(model, input_shape=(1, 1, 128, 128)):
 
 def soft_dice_coefficient(pred, target, epsilon=1e-6):
     """
-    Differentiable (soft) Dice coefficient for training.
-    Does not threshold predictions, allowing gradient flow.
+    Differentiable soft Dice. Works for logits and float masks.
+    Clamps to avoid Dice > 1 due to scaling errors.
     """
-    pred = torch.sigmoid(pred)  # convert logits to probabilities
+    pred = torch.sigmoid(pred)
+    # Ensure target is in [0, 1]
+    target = torch.clamp(target, 0, 1)
+
     intersection = (pred * target).sum(dim=(1, 2, 3))
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
     dice = (2. * intersection + epsilon) / (union + epsilon)
-    return dice.mean()
+    return torch.clamp(dice.mean(), 0.0, 1.0)
 
 def dice_loss(pred, target):
-    """Dice Loss = 1 - soft Dice."""
+    """Dice loss = 1 - soft Dice."""
     return 1 - soft_dice_coefficient(pred, target)
+
 
 
 def dice_coefficient(pred, target, epsilon=1e-6):
     """
-    Hard (binary) Dice for evaluation.
-    Thresholds predictions to 0/1 to compute discrete overlap.
+    Hard Dice for evaluation — thresholded at 0.5.
+    Also clamps results to [0, 1].
     """
     pred = torch.sigmoid(pred)
     pred = (pred > 0.5).float()
+    target = torch.clamp(target, 0, 1)
+
     intersection = (pred * target).sum(dim=(1, 2, 3))
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
     dice = (2. * intersection + epsilon) / (union + epsilon)
-    return dice.mean()
+    return torch.clamp(dice.mean(), 0.0, 1.0)

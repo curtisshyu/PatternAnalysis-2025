@@ -26,7 +26,7 @@ class HipMRIDataset(Dataset):
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
         self.resize = transforms.Resize(self.target_size, antialias=True)
-        
+
     def __len__(self):
         return len(self.image_files)
 
@@ -36,6 +36,12 @@ class HipMRIDataset(Dataset):
 
             image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
             mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
+
+            mask = mask.astype(np.float32)
+
+            # Normalize masks to 0–1 (important!)
+            if mask.max() > 1.0:
+                mask = mask / mask.max()
 
             if self.normalize:
                 image = (image - np.mean(image)) / np.std(image)
