@@ -26,6 +26,9 @@ class HipMRIDataset(Dataset):
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
         self.resize = transforms.Resize(self.target_size, antialias=True)
+        
+    def __len__(self):
+        return len(self.image_files)
 
     def __getitem__(self, idx):
             image_path = os.path.join(self.image_dir, self.image_files[idx])
