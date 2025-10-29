@@ -93,14 +93,15 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
         # Validation
         model.eval()
-        val_dice = 0.0
+        val_dices = []
         with torch.no_grad():
             for imgs, masks in val_loader:
                 imgs, masks = imgs.to(device), masks.to(device)
                 outputs = model(imgs)
-                val_dice += dice_coefficient(outputs, masks).item()
+                batch_dice = dice_coefficient(outputs, masks)
+                val_dices.append(batch_dice.item())
 
-        avg_val_dice = val_dice / len(val_loader)
+        avg_val_dice = sum(val_dices) / len(val_dices)
         print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
 
 

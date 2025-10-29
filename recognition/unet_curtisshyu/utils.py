@@ -37,16 +37,16 @@ def param_check(model, input_shape=(1, 1, 128, 128)):
 def dice_coefficient(pred, target, epsilon=1e-6):
     """
     Computes the Dice Coefficient between predicted and ground truth masks.
-    Works for binary segmentation.
+    Handles logits safely and averages correctly over batch.
     """
-    # Sigmoid to convert logits → probabilities
     pred = torch.sigmoid(pred)
-    pred = (pred > 0.5).float()  # binarise
+    pred = (pred > 0.5).float()
 
     intersection = (pred * target).sum(dim=(1, 2, 3))
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
+    dice = (2. * intersection + epsilon) / (union + epsilon)
 
-    dice = (2.0 * intersection + epsilon) / (union + epsilon)
+    dice = dice.clamp(min=0., max=1.)
     return dice.mean()
 
 def dice_loss(pred, target):
