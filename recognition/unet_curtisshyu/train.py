@@ -1,6 +1,7 @@
 from recognition.unet_curtisshyu.modules import UNet
 from recognition.unet_curtisshyu.utils import param_check
 from recognition.unet_curtisshyu.dataset import get_datasets
+from recognition.unet_curtisshyu.utils import plot_training_curves
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
@@ -8,6 +9,11 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 from recognition.unet_curtisshyu.utils import param_check, dice_coefficient, dice_loss
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+
 
 """
 Initial Sanity Check
@@ -73,6 +79,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
     print(f"Model initialized with {params:,} trainable parameters")
 
     best_val_dice = 0.0
+    train_losses, val_dices = [], []
     # Training loop
     for epoch in range(epochs):
         model.train()
@@ -90,10 +97,10 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
             train_loss += loss.item()
 
         avg_train_loss = train_loss / len(train_loader)
+        
 
         # Validation
         model.eval()
-        val_dices = []
         with torch.no_grad():
             for imgs, masks in val_loader:
                 imgs, masks = imgs.to(device), masks.to(device)
@@ -103,6 +110,8 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
         avg_val_dice = sum(val_dices) / len(val_dices)
         print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
+        train_losses.append(avg_train_loss)
+        val_dices.append(avg_val_dice)
 
 
         # Save checkpoint if validation improves
@@ -112,6 +121,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
             torch.save(model.state_dict(), save_path)
             print(f"New best model saved with Dice: {best_val_dice:.4f}")
 
+    plot_training_curves(train_losses, val_dices)
     print("Training loop successfully completed.")
     return model
 

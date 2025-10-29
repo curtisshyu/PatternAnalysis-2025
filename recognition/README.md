@@ -40,6 +40,9 @@ Input MRI -> U-net -> output is comapred to ground truth mask - loss function me
 # Utils.py
 - Testing the param count, we can use this for any model we pass later to for a sanity check
 - Ensure input and output tensors align
+- loss functions
+- coefficient functions
+- plotting functions
 
 # Train.py
 ## Sanity Check
