@@ -34,22 +34,30 @@ def param_check(model, input_shape=(1, 1, 128, 128)):
 
     return y, params_count
 
-def dice_coefficient(pred, target, epsilon=1e-6):
+def soft_dice_coefficient(pred, target, epsilon=1e-6):
     """
-    Computes the Dice Coefficient between predicted and ground truth masks.
-    Handles logits safely and averages correctly over batch.
+    Differentiable (soft) Dice coefficient for training.
+    Does not threshold predictions, allowing gradient flow.
     """
-    pred = torch.sigmoid(pred)
-    pred = (pred > 0.5).float()
-
+    pred = torch.sigmoid(pred)  # convert logits to probabilities
     intersection = (pred * target).sum(dim=(1, 2, 3))
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
     dice = (2. * intersection + epsilon) / (union + epsilon)
     return dice.mean()
 
 def dice_loss(pred, target):
+    """Dice Loss = 1 - soft Dice."""
+    return 1 - soft_dice_coefficient(pred, target)
+
+
+def dice_coefficient(pred, target, epsilon=1e-6):
     """
-    Dice Loss = 1 - Dice Coefficient.
-    Lower is better. Encourages spatial overlap.
+    Hard (binary) Dice for evaluation.
+    Thresholds predictions to 0/1 to compute discrete overlap.
     """
-    return 1 - dice_coefficient(pred, target)
+    pred = torch.sigmoid(pred)
+    pred = (pred > 0.5).float()
+    intersection = (pred * target).sum(dim=(1, 2, 3))
+    union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
+    dice = (2. * intersection + epsilon) / (union + epsilon)
+    return dice.mean()
