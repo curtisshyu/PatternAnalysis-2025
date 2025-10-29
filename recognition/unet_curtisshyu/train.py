@@ -117,4 +117,4 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
 
 if __name__ == "__main__":
-    train_model(epochs=10, lr=1e-4, batch_size=4)
+    train_model(epochs=25, lr=1e-4, batch_size=4)
