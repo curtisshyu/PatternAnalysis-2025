@@ -128,7 +128,7 @@ def test_model(checkpoint_path,
                batch_size):
     """
     Loads the best saved U-Net model and evaluates it on the unseen test set.
-    Computes the overall Dice coefficient to measure generalization.
+    Computes the overall Dice coefficient to measure generalisation.
     """
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
