@@ -11,12 +11,12 @@ class HipMRIDataset(Dataset):
     Loads 2D MRI slice images and corresponding segmentation masks 
     for prostate segmentation using the HipMRI dataset.
     """
-
-    def __init__(self, image_dir, mask_dir, transform=None, normalize=True):
+    def __init__(self, image_dir, mask_dir, transform=None, normalize=True, target_size=(128, 128)):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.transform = transform
         self.normalize = normalize
+        self.target_size = target_size
 
         # Get matching filenames
         self.image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(('.nii', '.nii.gz'))])
@@ -25,38 +25,34 @@ class HipMRIDataset(Dataset):
         assert len(self.image_files) == len(self.mask_files), \
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
-    def __len__(self):
-        return len(self.image_files)
+        self.resize = transforms.Resize(self.target_size, antialias=True)
 
     def __getitem__(self, idx):
-        # Load MRI and mask
-        image_path = os.path.join(self.image_dir, self.image_files[idx])
-        mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+            image_path = os.path.join(self.image_dir, self.image_files[idx])
+            mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
 
-        image = nib.load(image_path).get_fdata(caching='unchanged')
-        mask = nib.load(mask_path).get_fdata(caching='unchanged')
+            image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
+            mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
 
-        # Convert to float32 tensors
-        image = image.astype(np.float32)
-        mask = mask.astype(np.float32)
+            if self.normalize:
+                image = (image - np.mean(image)) / np.std(image)
 
-        # Normalise to zero mean, unit variance (as in your sample code)
-        if self.normalize:
-            image = (image - np.mean(image)) / np.std(image)
+            # Add channel dimension
+            image = np.expand_dims(image, axis=0)
+            mask = np.expand_dims(mask, axis=0)
 
-        # Add channel dimension (C, H, W)
-        image = np.expand_dims(image, axis=0)
-        mask = np.expand_dims(mask, axis=0)
+            image = torch.tensor(image, dtype=torch.float32)
+            mask = torch.tensor(mask, dtype=torch.float32)
 
-        image = torch.tensor(image, dtype=torch.float32)
-        mask = torch.tensor(mask, dtype=torch.float32)
+            # Resize both image and mask to fixed size
+            image = self.resize(image)
+            mask = self.resize(mask)
 
-        # Apply optional transforms (e.g., random flip)
-        if self.transform:
-            image = self.transform(image)
-            mask = self.transform(mask)
+            if self.transform:
+                image = self.transform(image)
+                mask = self.transform(mask)
 
-        return image, mask
+            return image, mask
 
 # Helper function to create train/val/test datasets
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
