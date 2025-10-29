@@ -10,6 +10,7 @@ import torch
 
 def param_check(model, input_shape = (1, 1, 128, 128)):
     # Dummy inputs
+    device = next(model.parameters()).device
     x = torch.randn(*input_shape)
 
     model.eval()
