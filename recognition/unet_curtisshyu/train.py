@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
+from recognition.unet_curtisshyu.utils import param_check, dice_coefficient, dice_loss
 
 """
 Initial Sanity Check
@@ -50,9 +51,10 @@ def sanity_check(device="cuda" if torch.cuda.is_available() else "cpu"):
 """
 Training Skeleton
 """
-def train_model(epochs, lr, batch_size):
+def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
     """
-     Trains U-Net model on the dataset for a number of epochs"""
+     Trains U-Net model on the dataset for a number of epochs
+    """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Training on device: {device}")
 
@@ -63,35 +65,55 @@ def train_model(epochs, lr, batch_size):
 
     # Model, loss, optimizer
     model = UNet(n_channels=1, n_classes=1).to(device)
-    criterion = nn.BCEWithLogitsLoss()
+    bce_loss = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Initial summary
     _, params = param_check(model)
     print(f"Model initialized with {params:,} trainable parameters")
 
+    best_val_dice = 0.0
     # Training loop
     for epoch in range(epochs):
         model.train()
-        running_loss = 0.0
+        train_loss = 0.0
 
         for imgs, masks in train_loader:
             imgs, masks = imgs.to(device), masks.to(device)
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = criterion(outputs, masks)
+            loss = 0.5 * bce_loss(outputs, masks) + 0.5 * dice_loss(outputs, masks)
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            train_loss += loss.item()
 
-        avg_loss = running_loss / len(train_loader)
-        print(f"Epoch [{epoch+1}/{epochs}] - Loss: {avg_loss:.4f}")
+        avg_train_loss = train_loss / len(train_loader)
 
-    print("Training loop successfully")
+        # Validation
+        model.eval()
+        val_dice = 0.0
+        with torch.no_grad():
+            for imgs, masks in val_loader:
+                imgs, masks = imgs.to(device), masks.to(device)
+                outputs = model(imgs)
+                val_dice += dice_coefficient(outputs, masks).item()
+
+        avg_val_dice = val_dice / len(val_loader)
+        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
+
+
+        # Save checkpoint if validation improves
+        if avg_val_dice > best_val_dice:
+            best_val_dice = avg_val_dice
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            torch.save(model.state_dict(), save_path)
+            print(f"New best model saved with Dice: {best_val_dice:.4f}")
+
+    print("Training loop successfully completed.")
     return model
 
 
 if __name__ == "__main__":
-    train_model(epochs=1, lr=1e-4, batch_size=2)
+    train_model(epochs=10, lr=1e-4, batch_size=4)

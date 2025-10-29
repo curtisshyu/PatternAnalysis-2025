@@ -25,8 +25,6 @@ This medical imaging format retains full voxel intensity data, preserving anatom
 Sorted filenames:
 Sorting ensures that image and mask pairs remain synchronized during iteration.
 
-
-
 # Overview module.py
 This module implements the 2D U-Net convolutional neural network used for prostate segmentation in the HipMRI Study dataset.
 The U-Net is a fully convolutional encoder–decoder architecture with skip connections, originally proposed for biomedical image segmentation.
@@ -39,3 +37,18 @@ Target: 0 = background, 1 = prostate (of interest)
 
 Input MRI -> U-net -> output is comapred to ground truth mask - loss function measures how close to real mask - gradients back propogate through network and weights get upadted
 
+# Utils.py
+- Testing the param count, we can use this for any model we pass later to for a sanity check
+- Ensure input and output tensors align
+
+# Train.py
+## Sanity Check
+- Loads the datsetets using dataset.py
+- instantiates modules
+- performs a single pass to match dimensions
+## train model
+- loads data into pytorch
+- initialises model
+- defines binary corss entropy corss logits
+- optimises weights
+- performs forward/backward propogation
