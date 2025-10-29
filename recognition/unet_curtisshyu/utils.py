@@ -8,6 +8,9 @@ Contains utility functions for U-Net architecture
 from recognition.unet_curtisshyu.modules import UNet
 import torch
 
+"""
+Sanity Check
+"""
 def param_check(model, input_shape=(1, 1, 128, 128)):
     """
     Runs a forward pass with a dummy tensor and prints model parameter count.
@@ -30,3 +33,4 @@ def param_check(model, input_shape=(1, 1, 128, 128)):
     print(f"Trainable parameters: {params_count:,}")
 
     return y, params_count
+
