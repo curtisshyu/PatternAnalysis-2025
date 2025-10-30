@@ -3,6 +3,7 @@ from recognition.unet_curtisshyu.utils import param_check
 from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import plot_training_curves
 from recognition.unet_curtisshyu.utils import weighted_bce_dice_loss, calculate_weight_map
+from recognition.unet_curtisshyu.utils import soft_dice_coefficient
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
@@ -88,9 +89,12 @@ def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/un
             optimizer.zero_grad()
 
             outputs = model(imgs)
-            weights = calculate_weight_map(masks.detach().cpu().numpy())
-            weights = torch.tensor(weights, device=device, dtype=torch.float32)
-            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_ratio)
+            outputs = model(imgs)
+
+            # simple BCE + Dice combo, no weight map
+            bce = nn.BCEWithLogitsLoss()(outputs, masks)
+            dsc = dice_loss(outputs, masks)
+            loss = bce_ratio * bce + (1 - bce_ratio) * dsc
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -107,9 +111,10 @@ def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/un
             for imgs, masks in val_loader:
                 imgs, masks = imgs.to(device), masks.to(device)
                 outputs = model(imgs)
-                dice_val = dice_coefficient(outputs, masks)
-                val_dice_epoch.append(dice_val)
-        avg_val_dice = np.mean(val_dice_epoch)
+                dice_val = soft_dice_coefficient(outputs, masks)
+                val_dice_epoch.append(dice_val.item())
+        avg_val_dice = float(np.mean(val_dice_epoch))
+
 
         print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f} | LR: {optimizer.param_groups[0]['lr']:.6f}")
 
@@ -173,7 +178,7 @@ def hyperparam_tuning():
         print("="*70)
 
         model = train_model(
-            epochs=25,
+            epochs=50,
             lr=cfg["lr"],
             batch_size=2,
             bce_ratio=cfg["bce_ratio"]
@@ -182,6 +187,5 @@ def hyperparam_tuning():
 
 
 if __name__ == "__main__":
-    #train_model(epochs=75, lr=5e-4, batch_size=4)
-    #test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2) 
-    hyperparam_tuning()
+    train_model(epochs=80, lr=5e-4, batch_size=2, bce_ratio=0.5)
+    test_model("recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)
