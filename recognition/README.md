@@ -1,85 +1,77 @@
-# Working README/notes
-This module defines the data loading and preprocessing pipeline for the HipMRI prostate cancer segmentation task.
-It loads 2D MRI slices and their corresponding segmentation masks from NIfTI (.nii / .nii.gz) files, applies normalization, and prepares the data for training a 2D U-Net segmentation model.
+# 2D U-Net Segmentation on HIPMRI Prostate Dataset
 
-The dataset represents a pixel-wise classification problem — each MRI slice is paired with a mask identifying which pixels correspond to the prostate region. The loader ensures that every image and mask pair is correctly aligned and converted into PyTorch tensors suitable for GPU training.
+## Project Overview
+This project implements a **2D U-Net convolutional neural network** for **automatic prostate segmentation** on the *HipMRI Study for Prostate Cancer Radiotherapy*.  
+The goal is to segment the prostate region from MRI slices to support clinical workflows such as **radiotherapy planning** and **organ delineation**.
 
-Accurate and efficient data loading is critical for deep learning pipelines.
-This module automates:
+The model is trained using processed 2D slices of the HipMRI dataset and evaluated on held-out test images, targeting a **minimum Dice similarity coefficient of 0.75** on the prostate label.
 
-- Reading the HipMRI dataset structure (train, validation, test splits)
-- Performing data normalization for stable neural network training
-- Formatting the MRI slices and segmentation masks into PyTorch tensors with channel-first convention ([C, H, W])
-- Optionally applying image transformations for augmentation or preprocessing
-- This enables seamless integration with PyTorch’s DataLoader, allowing mini-batch training and shuffling across thousands of MRI slices.
+## Algorithm Description
 
-Normalization:
-MRI intensities vary significantly across scans; zero-mean, unit-variance normalization standardizes pixel values, allowing the network to focus on structural patterns rather than brightness variations.
+### Model Architechture
+The algorithm is based on the **U-Net** architecture (Ronneberger et al., 2015), a fully convolutional encoder–decoder network designed for biomedical image segmentation.  
+It captures both **low-level spatial features** and **high-level semantic features** through symmetric skip connections.
 
-Channel-first tensors:
-PyTorch models expect inputs in [C, H, W] format; hence, a channel dimension is explicitly added even for grayscale (single-channel) MRI data.
+- **Encoder:** Sequential convolution–batchnorm–ReLU blocks with max pooling (downsampling)
+- **Bottleneck:** Deepest layer capturing context
+- **Decoder:** Upsampling via bilinear interpolation + concatenation with encoder features
+- **Output Layer:** 1×1 convolution → single-channel sigmoid mask prediction
 
-NIfTI format (.nii, .nii.gz):
-This medical imaging format retains full voxel intensity data, preserving anatomical accuracy over lossy formats like .png.
+## Visualisation
+- TO COMPLETE
 
-Sorted filenames:
-Sorting ensures that image and mask pairs remain synchronized during iteration.
+## How it works
 
-# Overview module.py
-This module implements the 2D U-Net convolutional neural network used for prostate segmentation in the HipMRI Study dataset.
-The U-Net is a fully convolutional encoder–decoder architecture with skip connections, originally proposed for biomedical image segmentation.
-It allows the model to capture both global context and fine spatial details, which is essential when identifying structures like the prostate in MRI slices.
+1. **Pre-processing:**
+   - MRI slices (`.nii`/`.nii.gz`) are normalized between the 1st and 99th percentile of intensity values.  
+   - Values are standardized to zero mean and unit variance.  
+   - Masks are normalized to [0,1] and resized to **256×256**.
+   - Spatial Augmentation (random flipping and transformations) are applied to increase robustness to orientaiton and variability in MRI scans
 
-DoubleConv → Down → Up → OutConv → UNet
+2. **Training:**  
+   - Uses the **Tversky loss** (α=0.7, β=0.3) to handle strong class imbalance between prostate and background pixels.  
+   - Optimizer: **Adam** with learning rate `1e-3`  
+   - Batch size: 4, 50 epochs  
+   - Validation Dice used to save the best-performing model.
+   - Training Curves plotted to examine behviour
 
-Input: A single channel 2D MRI slice
-Target: 0 = background, 1 = prostate (of interest)
-
-Input MRI -> U-net -> output is comapred to ground truth mask - loss function measures how close to real mask - gradients back propogate through network and weights get upadted
-
-# Utils.py
-- Testing the param count, we can use this for any model we pass later to for a sanity check
-- Ensure input and output tensors align
-- loss functions
-- coefficient functions
-- plotting functions
-
-# Train.py
-## Sanity Check
-- Loads the datsetets using dataset.py
-- instantiates modules
-- performs a single pass to match dimensions
-## train model
-- loads data into pytorch
-- initialises model
-- defines binary corss entropy corss logits
-- optimises weights
-- performs forward/backward propogation
-## Validtion/Testing
-When we “implement validation” before training the full model, we’re not training on it — we’re simply setting up a diagnostic mechanism that tells us:
-If you only track training loss:
-You might see it go to near 0,
-But your model could fail miserably on new data → overfitting.
-The validation set acts as a checkpoint: it’s not used for gradient updates, but after each epoch we:
-Freeze the model.
-Run it on the validation data.
-Compute metrics (e.g. Dice score).
-Compare to previous epochs.
-## Scheduler
-- Montiors validation, if it does not improve for 3 pochs, reduces lr by a fctor of 0.5
-Allows us to escape plateaus
-- mode = max monitors validation
-- factor is how much to reduce by
-- patience is count wihtout improvement to reduce
-
-## Hyperparam tuning
-- lightweight grid search function toe xplore combination of learning rates, BCE dice loss weights
+3. **Evaluation:**  
+   - Performance measured using the **Dice Similarity Coefficient (DSC)** on the held-out test set.  
+   - Qualitative evaluation includes overlaying predicted segmentation masks on MRI slices.
 
 
-dataset.py
-- justify the transforms augmentation
-- mimic realsitic mri variablity
-- improve generalisation, and reduce overfitting
-- exploit symmetry in left-right anatomical symmetry
-- simulate minor slice orientaiton that occur during acuqistion
-- mimic small patient alignment or scanner rotation
+## Dataset
+
+The dataset used is the **HipMRI Study Open Dataset**:  
+`/home/groups/comp3710/HipMRI_Study_open/keras_slices_data`
+
+Data sets are splot as follows
+| **Train** | `keras_slices_train` / `keras_slices_seg_train` | Model fitting | Contains majority of samples for learning |
+| **Validation** | `keras_slices_validate` / `keras_slices_seg_validate` | Hyperparameter & checkpoint selection | Prevents overfitting, unseen during training |
+| **Test** | `keras_slices_test` / `keras_slices_seg_test` | Final model evaluation | Provides unbiased estimate of performance |
+
+--- 
+
+## Example Usage
+- TO COMPLETE
+
+## Reproducibility
+- No Random seeds to consider fixed across the codebase
+- Dataset splits are static
+- All results saved under checkpoints/unet_best.pth
+- training_curve.png and training_curve.csv 
+
+## Dependencies
+Python 3.10.2
+MacOS 15.6.1
+torch 2.9.0
+pandas
+matplotlib
+numpy
+nibabel
+albumentations
+
+Install via:
+
+```bash
+pip install pandas
