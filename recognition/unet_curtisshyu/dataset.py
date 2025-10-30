@@ -22,8 +22,9 @@ class HipMRIDataset(Dataset):
 
         self.augmentations = transforms.Compose([
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.3),
-            transforms.RandomRotation(degrees=15),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomRotation(20),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1),
         ])
 
         # Get matching filenames

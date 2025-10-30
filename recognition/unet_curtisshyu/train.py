@@ -2,6 +2,7 @@ from recognition.unet_curtisshyu.modules import UNet
 from recognition.unet_curtisshyu.utils import param_check
 from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import plot_training_curves
+from recognition.unet_curtisshyu.utils import weighted_bce_dice_loss, calculate_weight_map
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
@@ -75,8 +76,8 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Add learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='min', factor=0.5, patience=3)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-6)
+
 
     # Initial summary
     _, params = param_check(model)
@@ -94,7 +95,9 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = bce_weight * bce_loss(outputs, masks) + dice_weight * dice_loss(outputs, masks)
+            weights = calculate_weight_map(masks.detach().cpu().numpy())
+            weights = torch.tensor(weights, device=device)
+            loss = weighted_bce_dice_loss(torch.sigmoid(outputs), masks, weights)
             loss.backward()
             optimizer.step()
 
@@ -110,14 +113,14 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
                 outputs = model(imgs)
                 batch_dice = dice_coefficient(outputs, masks)
                 val_dices.append(batch_dice.item())
-
+        
         avg_val_dice = sum(val_dices) / len(val_dices)
         print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
         train_losses.append(avg_train_loss)
         val_dices.append(avg_val_dice)
 
         # Step scheduler based on validation Dice
-        scheduler.step(avg_val_dice)
+        scheduler.step()
         print(f"Epoch {epoch+1} — Current LR: {optimizer.param_groups[0]['lr']:.6f}")
         # Save checkpoint if validation improves
         if avg_val_dice > best_val_dice:
