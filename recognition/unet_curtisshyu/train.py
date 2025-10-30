@@ -180,7 +180,7 @@ def hyperparam_tuning():
 
     for cfg in configs:
         print("=" * 70)
-        print(f"Running config → LR: {cfg['lr']}, BCE: {cfg['bce_weight']}, DICE: {cfg['dice_weight']}")
+        print(f"Running config → LR: {cfg['lr']}")
         print("=" * 70)
 
         # Call training loop with custom loss weights
