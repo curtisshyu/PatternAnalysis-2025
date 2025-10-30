@@ -193,5 +193,6 @@ def hyperparam_tuning():
 
 
 if __name__ == "__main__":
-    train_model(epochs=75, lr=5e-4, batch_size=4)
-    test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2) 
+    #train_model(epochs=75, lr=5e-4, batch_size=4)
+    #test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2) 
+    hyperparam_tuning()
