@@ -22,10 +22,21 @@ def hard_dice(pred, target, thresh=0.5, eps=1e-6):
     dice = (2*inter + eps) / (denom + eps)
     return dice.mean()
 
-def bce_dice_loss(pred, target, bce_weight=0.5):
-    bce = nn.BCEWithLogitsLoss()(pred, target)
+def bce_dice_loss(pred, target, bce_weight=0.5, pos_weight=None):
+    """
+    Combined BCE + Dice loss.
+    Optionally supports class weighting via pos_weight (for rare prostate pixels).
+    """
+    # If a pos_weight is provided, use it in BCE
+    if pos_weight is not None:
+        bce_loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    else:
+        bce_loss_fn = nn.BCEWithLogitsLoss()
+
+    bce = bce_loss_fn(pred, target)
     d = soft_dice(pred, target)
     return bce_weight * bce + (1 - bce_weight) * (1 - d)
+
 
 def plot_training(train_losses, val_dices, save_path="training_curve.png"):
     epochs = range(1, len(train_losses)+1)

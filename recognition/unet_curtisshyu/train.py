@@ -24,6 +24,8 @@ def train_model(epochs, lr, batch_size, bce_weight):
         print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    pos_weight = torch.tensor([3.0]).to(device)  
+
     best_val_dice = 0.0
     train_losses = []
     val_dices = []
@@ -38,7 +40,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = tversky_loss(outputs, masks)
+            loss = bce_dice_loss(outputs, masks, bce_weight=bce_weight, pos_weight=pos_weight)
             loss.backward()
             optimizer.step()
 
