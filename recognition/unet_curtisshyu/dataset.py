@@ -65,10 +65,10 @@ class HipMRIDataset(Dataset):
         # Albumentation
         image = image.astype(np.float32)
         mask = mask.astype(np.float32)
-
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
-        mask = augmented["mask"]
+        mask = augmented["mask"].unsqueeze(0) if augmented["mask"].ndim == 2 else augmented["mask"]
+
 
         return image, mask
 
