@@ -65,12 +65,14 @@ class HipMRIDataset(Dataset):
         # Albumentation
         image = image.astype(np.float32)
         mask = mask.astype(np.float32)
-
         augmented = self.transform(image=image, mask=mask)
-        image = augmented["image"].unsqueeze(0)   # back to [1,H,W]
-        mask = augmented["mask"].unsqueeze(0)
+        image = augmented["image"]
+        mask = augmented["mask"]
 
+        if mask.ndim == 2:      # (H, W)
+            mask = mask.unsqueeze(0)
         return image, mask
+
 
 
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
