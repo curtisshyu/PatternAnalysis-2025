@@ -4,8 +4,6 @@ from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import plot_training_curves
 from recognition.unet_curtisshyu.utils import weighted_bce_dice_loss, calculate_weight_map
 from recognition.unet_curtisshyu.utils import soft_dice_coefficient
-from recognition.unet_curtisshyu.utils import combined_loss
-from recognition.unet_curtisshyu.utils import simple_dice_bce_loss
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
@@ -61,32 +59,54 @@ def sanity_check(device="cuda" if torch.cuda.is_available() else "cpu"):
 """
 Training Skeleton
 """
-def train_model(epochs=100, lr=1e-4, batch_size=8):
+def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+    print(f"Training on device: {device}")
+
+    # Load data
     train_set, val_set, _ = get_datasets()
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=batch_size)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
+    val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=2)
 
     model = UNet(n_channels=1, n_classes=1).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    
+    if os.path.exists(save_path):
+        model.load_state_dict(torch.load(save_path, map_location=device))
+        print("Loaded previous checkpoint for fine-tuning.")
+
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer, total_iters=epochs, power=0.9)
+
+
+    _, params = param_check(model)
+    print(f"Model initialized with {params:,} parameters")
+
     best_val_dice = 0
     train_losses, val_dices = [], []
 
     for epoch in range(epochs):
-        # Training
         model.train()
         epoch_loss = 0
+
         for imgs, masks in train_loader:
             imgs, masks = imgs.to(device), masks.to(device)
-            
             optimizer.zero_grad()
+
+            # Forward pass
             outputs = model(imgs)
-            loss = simple_dice_bce_loss(outputs, masks, dice_weight=0.5)
-            
+
+            # Compute weight map
+            weight_np = calculate_weight_map(masks.detach().cpu().numpy())
+            weights = torch.tensor(weight_np, device=device, dtype=torch.float32)
+
+            # Weighted BCE + Dice loss
+            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_ratio)
+
+            # Backpropagation
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            scheduler.step()
+
             epoch_loss += loss.item()
 
         avg_train_loss = epoch_loss / len(train_loader)
@@ -100,19 +120,22 @@ def train_model(epochs=100, lr=1e-4, batch_size=8):
                 outputs = model(imgs)
                 dice_val = soft_dice_coefficient(outputs, masks)
                 val_dice_epoch.append(dice_val.item())
-        
-        avg_val_dice = np.mean(val_dice_epoch)
+        avg_val_dice = float(np.mean(val_dice_epoch))
 
-        print(f"Epoch [{epoch+1}/{epochs}] - Loss: {avg_train_loss:.4f} - Dice: {avg_val_dice:.4f}")
+
+        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f} | LR: {optimizer.param_groups[0]['lr']:.6f}")
 
         train_losses.append(avg_train_loss)
         val_dices.append(avg_val_dice)
 
         if avg_val_dice > best_val_dice:
             best_val_dice = avg_val_dice
-            torch.save(model.state_dict(), "best_model.pth")
-            print(f"Saved best model with Dice: {best_val_dice:.4f}")
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            torch.save(model.state_dict(), save_path)
+            print(f"New best model saved with Dice: {best_val_dice:.4f}")
 
+    plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png")
+    print("Training completed.")
     return model
 
 
@@ -171,5 +194,5 @@ def hyperparam_tuning():
 
 
 if __name__ == "__main__":
-    train_model(epochs=100, lr=1e-4, batch_size=8)
+    train_model(epochs=40, lr=3e-4, batch_size=2, bce_ratio=0.3)
     test_model("recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)

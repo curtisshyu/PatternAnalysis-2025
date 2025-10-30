@@ -150,15 +150,4 @@ def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_cu
         "val_dice": val_dices
     }).to_csv(os.path.splitext(save_path)[0] + "_log.csv", index=False)
 
-def combined_loss(pred, target, bce_weight=0.5):
-    """Simpler combined loss"""
-    bce_loss = nn.BCEWithLogitsLoss()(pred, target)
-    dice_loss_val = dice_loss(pred, target)
-    return bce_weight * bce_loss + (1 - bce_weight) * dice_loss_val
-
-def simple_dice_bce_loss(pred, target, dice_weight=0.5):
-    """Simple combined loss - much more stable"""
-    bce_loss = nn.BCEWithLogitsLoss()(pred, target)
-    dice_loss_val = dice_loss(pred, target)
-    return (1 - dice_weight) * bce_loss + dice_weight * dice_loss_val
 
