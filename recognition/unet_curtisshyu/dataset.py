@@ -67,8 +67,8 @@ class HipMRIDataset(Dataset):
         mask = mask.astype(np.float32)
 
         augmented = self.transform(image=image, mask=mask)
-        image = augmented["image"].unsqueeze(0)   # back to [1,H,W]
-        mask = augmented["mask"].unsqueeze(0)
+        image = augmented["image"]
+        mask = augmented["mask"]
 
         return image, mask
 
