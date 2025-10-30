@@ -53,7 +53,8 @@ class HipMRIDataset(Dataset):
                 mask = mask / mask.max()
 
             if self.normalize:
-                image = (image - np.mean(image)) / np.std(image)
+            # Normalize MRI intensity
+                image = (image - np.mean(image)) / (np.std(image) + 1e-5) # PREVENT ZERO DIV
 
             # Add channel dimension
             image = np.expand_dims(image, axis=0)

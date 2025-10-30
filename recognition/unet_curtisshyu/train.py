@@ -173,9 +173,9 @@ def hyperparam_tuning():
     """
 
     configs = [
-        {"lr": 1e-3, "bce_weight": 0.3, "dice_weight": 0.7},
-        {"lr": 5e-4, "bce_weight": 0.5, "dice_weight": 0.5},
-        {"lr": 2e-4, "bce_weight": 0.7, "dice_weight": 0.3},
+        {"lr": 1e-3},
+        {"lr": 5e-4},
+        {"lr": 2e-4}
     ]
 
     for cfg in configs:
@@ -187,9 +187,7 @@ def hyperparam_tuning():
         model = train_model(
             epochs=25,
             lr=cfg["lr"],
-            batch_size=4,
-            bce_weight=cfg["bce_weight"],
-            dice_weight=cfg["dice_weight"],
+            batch_size=4
         )
 
     print("\nHyperparameter tuning completed. Compare validation curves or Dice scores to select best combo.")
