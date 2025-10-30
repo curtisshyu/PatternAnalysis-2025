@@ -22,9 +22,9 @@ class HipMRIDataset(Dataset):
 
         self.augmentations = transforms.Compose([
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomRotation(20),
-            transforms.ColorJitter(brightness=0.1, contrast=0.1),
+            transforms.RandomVerticalFlip(p=0.2),
+            transforms.RandomRotation(degrees=10),
+            transforms.RandomAffine(degrees=0, translate=(0.05, 0.05), scale=(0.9, 1.1)),
         ])
 
         # Get matching filenames
@@ -53,8 +53,8 @@ class HipMRIDataset(Dataset):
                 mask = mask / mask.max()
 
             if self.normalize:
-            # Normalize MRI intensity
-                image = (image - np.mean(image)) / (np.std(image) + 1e-5) # PREVENT ZERO DIV
+                image = np.clip(image, np.percentile(image, 1), np.percentile(image, 99))
+                image = (image - np.mean(image)) / (np.std(image) + 1e-5)
 
             # Add channel dimension
             image = np.expand_dims(image, axis=0)

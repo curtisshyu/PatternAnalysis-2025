@@ -56,50 +56,48 @@ def soft_dice_coefficient(pred, target, epsilon=1e-6):
     dice = (2. * intersection + epsilon) / (union + epsilon)
     return torch.clamp(dice.mean(), 0.0, 1.0)
 
-def dice_loss(pred, target):
-    """Dice loss = 1 - soft Dice."""
-    return 1 - soft_dice_coefficient(pred, target)
+def dice_loss(pred, target, smooth=1.0):
+    """Stable soft Dice loss that tolerates class imbalance."""
+    pred = torch.sigmoid(pred)
+    target = torch.clamp(target, 0, 1)
+    intersection = (pred * target).sum(dim=(1, 2, 3))
+    union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
+    dice = (2. * intersection + smooth) / (union + smooth)
+    return 1 - dice.mean()
 
-def dice_coefficient(pred, target, epsilon=1e-6):
+def dice_coefficient(pred, target, threshold=0.4, epsilon=1e-6):
     """
-    Hard Dice for evaluation — thresholded at 0.5.
-    Also clamps results to [0, 1].
+    Dice score on binary masks (thresholded sigmoid outputs).
     """
     pred = torch.sigmoid(pred)
-    pred = (pred > 0.3).float()
+    pred = (pred > threshold).float()
     target = torch.clamp(target, 0, 1)
-
     intersection = (pred * target).sum(dim=(1, 2, 3))
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
     dice = (2. * intersection + epsilon) / (union + epsilon)
-    return torch.clamp(dice.mean(), 0.0, 1.0)
+    return dice.mean().item()
 
 def get_class_weights(mask):
-    """
-    Assign higher weight to underrepresented class pixels.
-    """
-    weight = np.zeros(mask.shape)
+    """Higher weight on underrepresented class pixels."""
     c0 = (mask == 0)
     c1 = (mask == 1)
     total = mask.size
     count_0 = c0.sum()
     count_1 = c1.sum()
-    if count_1 < 10:  # avoid division by zero
+    if count_1 < 10:
         return np.ones(mask.shape)
-    weight_0 = total / (2.0 * count_0)
-    weight_1 = total / (2.0 * count_1)
-    weight += weight_0 * c0 + weight_1 * c1
-    return weight
+    w0 = total / (2.0 * count_0)
+    w1 = total / (2.0 * count_1)
+    return w0 * c0 + w1 * c1
 
-def weight_map(mask, w0=10, sigma=5):
-    """
-    Create a distance-based weight map that penalizes boundary pixels more.
-    """
+def weight_map(mask, w0=8, sigma=6):
+    """Adds Gaussian boundary weighting for prostate edges."""
     mask = mask.astype(np.uint8)
-    dist = distance_transform_edt(1 - mask) + distance_transform_edt(mask)
-    w = w0 * np.exp(- (dist ** 2) / (2 * (sigma ** 2)))
+    dist_bg = distance_transform_edt(mask == 0)
+    dist_fg = distance_transform_edt(mask == 1)
+    boundary = np.exp(-((dist_fg + dist_bg) ** 2) / (2 * sigma ** 2))
     wc = get_class_weights(mask)
-    return wc + w
+    return wc + w0 * boundary
 
 def calculate_weight_map(masks: np.ndarray):
     weights = []
@@ -117,20 +115,12 @@ def dice_coef_loss(pred, target, smooth=1.0):
     dice = (2.0 * intersection + smooth) / (union + smooth)
     return 1.0 - dice
 
-def weighted_bce_dice_loss(pred, target, weights):
-    """
-    Weighted BCE + Dice, stable form.
-    Assumes `pred` are raw logits.
-    """
-    # BCE with logits (internally applies sigmoid)
-    bce = nn.BCEWithLogitsLoss(reduction="none")(pred, target)
-    weighted_bce = (bce * weights).mean()
-
-    # Dice on sigmoid probabilities
-    probs = torch.sigmoid(pred)
-    dice = dice_coef_loss(probs, target)
-
-    return weighted_bce + dice
+def weighted_bce_dice_loss(pred, target, weights, bce_ratio=0.5):
+    """Weighted BCE + Dice combo (tunable ratio)."""
+    bce = nn.BCEWithLogitsLoss(reduction='none')(pred, target)
+    bce = (bce * weights.unsqueeze(1)).mean()
+    dsc = dice_loss(pred, target)
+    return bce_ratio * bce + (1 - bce_ratio) * dsc
 
 def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png"):
     import matplotlib.pyplot as plt, pandas as pd, os

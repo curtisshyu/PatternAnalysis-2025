@@ -58,72 +58,64 @@ def sanity_check(device="cuda" if torch.cuda.is_available() else "cpu"):
 """
 Training Skeleton
 """
-def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
-    """
-     Trains U-Net model on the dataset for a number of epochs
-    """
+def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Training on device: {device}")
 
-    # Load datasets
+    # Load data
     train_set, val_set, _ = get_datasets()
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=batch_size)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
+    val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=2)
 
-    # Model, loss, optimizer
     model = UNet(n_channels=1, n_classes=1).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs, pct_start=0.3
+    )
 
-    # Add learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=75, eta_min=1e-6)
-
-
-    # Initial summary
     _, params = param_check(model)
-    print(f"Model initialized with {params:,} trainable parameters")
+    print(f"Model initialized with {params:,} parameters")
 
-    best_val_dice = 0.0
+    best_val_dice = 0
     train_losses, val_dices = [], []
-    # Training loop
+
     for epoch in range(epochs):
         model.train()
-        train_loss = 0.0
+        epoch_loss = 0
 
         for imgs, masks in train_loader:
             imgs, masks = imgs.to(device), masks.to(device)
-
             optimizer.zero_grad()
+
             outputs = model(imgs)
             weights = calculate_weight_map(masks.detach().cpu().numpy())
-            weights = torch.tensor(weights, device=device)
-            loss = weighted_bce_dice_loss(outputs, masks, weights)
+            weights = torch.tensor(weights, device=device, dtype=torch.float32)
+            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_ratio)
+
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            scheduler.step()
+            epoch_loss += loss.item()
 
-            train_loss += loss.item()
+        avg_train_loss = epoch_loss / len(train_loader)
 
-        avg_train_loss = train_loss / len(train_loader)
-        
         # Validation
-        val_dices_epoch = []
         model.eval()
+        val_dice_epoch = []
         with torch.no_grad():
             for imgs, masks in val_loader:
                 imgs, masks = imgs.to(device), masks.to(device)
                 outputs = model(imgs)
-                batch_dice = dice_coefficient(outputs, masks)
-                val_dices_epoch.append(batch_dice.item())
-        
-        avg_val_dice = sum(val_dices_epoch) / len(val_dices_epoch)
+                dice_val = dice_coefficient(outputs, masks)
+                val_dice_epoch.append(dice_val)
+        avg_val_dice = np.mean(val_dice_epoch)
+
+        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f} | LR: {optimizer.param_groups[0]['lr']:.6f}")
+
         train_losses.append(avg_train_loss)
         val_dices.append(avg_val_dice)
-        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
 
-        # Step scheduler based on validation Dice
-        scheduler.step()
-        print(f"Epoch {epoch+1} — Current LR: {optimizer.param_groups[0]['lr']:.6f}")
-        # Save checkpoint if validation improves
         if avg_val_dice > best_val_dice:
             best_val_dice = avg_val_dice
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -131,8 +123,9 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
             print(f"New best model saved with Dice: {best_val_dice:.4f}")
 
     plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png")
-    print("Training loop successfully completed.")
+    print("Training completed.")
     return model
+
 
 def test_model(checkpoint_path,
                batch_size):
@@ -166,31 +159,25 @@ def test_model(checkpoint_path,
     return avg_dice
 
 def hyperparam_tuning():
-    """
-    Runs a small grid search over learning rate and BCE/Dice loss weight combinations.
-    Each configuration trains for 25 epochs and logs its validation Dice performance.
-
-    Used to determine the best hyperparameters before long-run training.
-    """
-
     configs = [
-        {"lr": 1e-3},
-        {"lr": 5e-4},
-        {"lr": 2e-4}
+        {"lr": 1e-3, "bce_ratio": 0.3},
+        {"lr": 7e-4, "bce_ratio": 0.4},
+        {"lr": 5e-4, "bce_ratio": 0.5},
+        {"lr": 3e-4, "bce_ratio": 0.6},
+        {"lr": 2e-4, "bce_ratio": 0.4}
     ]
 
     for cfg in configs:
-        print("=" * 70)
-        print(f"Running config → LR: {cfg['lr']}")
-        print("=" * 70)
+        print("="*70)
+        print(f"Running config → LR: {cfg['lr']} | BCE ratio: {cfg['bce_ratio']}")
+        print("="*70)
 
-        # Call training loop with custom loss weights
         model = train_model(
             epochs=25,
             lr=cfg["lr"],
-            batch_size=2
+            batch_size=2,
+            bce_ratio=cfg["bce_ratio"]
         )
-
     print("\nHyperparameter tuning completed. Compare validation curves or Dice scores to select best combo.")
 
 
