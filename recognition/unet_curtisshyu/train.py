@@ -75,7 +75,7 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Add learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-6)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=75, eta_min=1e-6)
 
 
     # Initial summary
@@ -98,6 +98,7 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
             weights = torch.tensor(weights, device=device)
             loss = weighted_bce_dice_loss(outputs, masks, weights)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             train_loss += loss.item()

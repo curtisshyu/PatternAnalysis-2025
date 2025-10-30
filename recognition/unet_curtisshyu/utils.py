@@ -66,7 +66,7 @@ def dice_coefficient(pred, target, epsilon=1e-6):
     Also clamps results to [0, 1].
     """
     pred = torch.sigmoid(pred)
-    pred = (pred > 0.5).float()
+    pred = (pred > 0.3).float()
     target = torch.clamp(target, 0, 1)
 
     intersection = (pred * target).sum(dim=(1, 2, 3))
@@ -91,7 +91,7 @@ def get_class_weights(mask):
     weight += weight_0 * c0 + weight_1 * c1
     return weight
 
-def weight_map(mask, w0=3, sigma=8):
+def weight_map(mask, w0=10, sigma=5):
     """
     Create a distance-based weight map that penalizes boundary pixels more.
     """
@@ -108,13 +108,28 @@ def calculate_weight_map(masks: np.ndarray):
     return np.array(weights)
 
 
+def dice_coef_loss(pred, target, smooth=1.0):
+    """
+    Soft Dice loss (expects sigmoid probs)
+    """
+    intersection = (pred * target).sum()
+    union = pred.sum() + target.sum()
+    dice = (2.0 * intersection + smooth) / (union + smooth)
+    return 1.0 - dice
+
 def weighted_bce_dice_loss(pred, target, weights):
     """
-    Combines weighted BCE and Dice.
+    Weighted BCE + Dice, stable form.
+    Assumes `pred` are raw logits.
     """
-    bce = nn.BCELoss(reduction='none')(pred, target)
+    # BCE with logits (internally applies sigmoid)
+    bce = nn.BCEWithLogitsLoss(reduction="none")(pred, target)
     weighted_bce = (bce * weights).mean()
-    dice = 1 - soft_dice_coefficient(pred, target)
+
+    # Dice on sigmoid probabilities
+    probs = torch.sigmoid(pred)
+    dice = dice_coef_loss(probs, target)
+
     return weighted_bce + dice
 
 def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png"):
@@ -145,5 +160,6 @@ def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_cu
         "train_loss": train_losses,
         "val_dice": val_dices
     }).to_csv(os.path.splitext(save_path)[0] + "_log.csv", index=False)
+
 
 
