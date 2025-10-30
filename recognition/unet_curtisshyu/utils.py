@@ -91,7 +91,7 @@ def get_class_weights(mask):
     weight += weight_0 * c0 + weight_1 * c1
     return weight
 
-def weight_map(mask, w0=10, sigma=5):
+def weight_map(mask, w0=3, sigma=8):
     """
     Create a distance-based weight map that penalizes boundary pixels more.
     """

@@ -72,7 +72,6 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
 
     # Model, loss, optimizer
     model = UNet(n_channels=1, n_classes=1).to(device)
-    bce_loss = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Add learning rate scheduler
@@ -97,7 +96,7 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
             outputs = model(imgs)
             weights = calculate_weight_map(masks.detach().cpu().numpy())
             weights = torch.tensor(weights, device=device)
-            loss = weighted_bce_dice_loss(torch.sigmoid(outputs), masks, weights)
+            loss = weighted_bce_dice_loss(outputs, masks, weights)
             loss.backward()
             optimizer.step()
 
@@ -106,6 +105,7 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
         avg_train_loss = train_loss / len(train_loader)
         
         # Validation
+        val_dices_epoch = []
         model.eval()
         with torch.no_grad():
             for imgs, masks in val_loader:
@@ -114,10 +114,10 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
                 batch_dice = dice_coefficient(outputs, masks)
                 val_dices.append(batch_dice.item())
         
-        avg_val_dice = sum(val_dices) / len(val_dices)
-        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
+        avg_val_dice = sum(val_dices_epoch) / len(val_dices_epoch)
         train_losses.append(avg_train_loss)
         val_dices.append(avg_val_dice)
+        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Dice: {avg_val_dice:.4f}")
 
         # Step scheduler based on validation Dice
         scheduler.step()
@@ -187,7 +187,7 @@ def hyperparam_tuning():
         model = train_model(
             epochs=25,
             lr=cfg["lr"],
-            batch_size=4
+            batch_size=2
         )
 
     print("\nHyperparameter tuning completed. Compare validation curves or Dice scores to select best combo.")
