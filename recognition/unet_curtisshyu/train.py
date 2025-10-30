@@ -69,8 +69,12 @@ def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/un
     val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=2)
 
     model = UNet(n_channels=1, n_classes=1).to(device)
+    if os.path.exists(save_path):
+        model.load_state_dict(torch.load(save_path, map_location=device))
+        print("Loaded previous checkpoint for fine-tuning.")
+
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+    scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer, total_iters=epochs, power=0.9)
 
 
     _, params = param_check(model)
@@ -190,5 +194,5 @@ def hyperparam_tuning():
 
 
 if __name__ == "__main__":
-    train_model(epochs=40, lr=3e-4, batch_size=2, bce_ratio=0.6)
+    train_model(epochs=40, lr=3e-4, batch_size=2, bce_ratio=0.3)
     test_model("recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)

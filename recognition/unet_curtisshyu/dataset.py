@@ -3,87 +3,81 @@ import numpy as np
 import nibabel as nib
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
-from tqdm import tqdm
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 class HipMRIDataset(Dataset):
     """
     Loads 2D MRI slice images and corresponding segmentation masks 
     for prostate segmentation using the HipMRI dataset.
     """
-    def __init__(self, image_dir, mask_dir, transform=None, normalize=True, target_size=(128, 128), augment = False):
+    def __init__(self, image_dir, mask_dir, normalize=True, target_size=(256, 256), augment=False):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
-        self.transform = transform
         self.normalize = normalize
         self.target_size = target_size
         self.augment = augment
-        self.resize = transforms.Resize(self.target_size, antialias=True)
 
-        self.augmentations = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.2),
-            transforms.RandomRotation(degrees=10),
-            transforms.RandomAffine(degrees=0, translate=(0.05, 0.05), scale=(0.9, 1.1)),
-        ])
+        # Albumentations transform (synchronised image-mask aug)
+        if augment:
+            self.transform = A.Compose([
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.2),
+                A.RandomRotate90(p=0.3),
+                A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.1, rotate_limit=10, p=0.5, border_mode=0),
+                A.Resize(height=self.target_size[0], width=self.target_size[1]),
+                A.Normalize(mean=0.0, std=1.0),
+                ToTensorV2()
+            ])
+        else:
+            self.transform = A.Compose([
+                A.Resize(height=self.target_size[0], width=self.target_size[1]),
+                A.Normalize(mean=0.0, std=1.0),
+                ToTensorV2()
+            ])
 
-        # Get matching filenames
+        # Match filenames
         self.image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(('.nii', '.nii.gz'))])
         self.mask_files = sorted([f for f in os.listdir(mask_dir) if f.endswith(('.nii', '.nii.gz'))])
 
         assert len(self.image_files) == len(self.mask_files), \
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
-        
-
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-            image_path = os.path.join(self.image_dir, self.image_files[idx])
-            mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+        image_path = os.path.join(self.image_dir, self.image_files[idx])
+        mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
 
-            image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
-            mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
+        image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
+        mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
 
-            mask = mask.astype(np.float32)
+        # Normalize mask to 0–1
+        if mask.max() > 1.0:
+            mask = mask / mask.max()
 
-            # Normalize masks to 0–1 (important!)
-            if mask.max() > 1.0:
-                mask = mask / mask.max()
+        # Clip + normalize image
+        if self.normalize:
+            image = np.clip(image, np.percentile(image, 1), np.percentile(image, 99))
+            image = (image - np.mean(image)) / (np.std(image) + 1e-5)
 
-            if self.normalize:
-                image = np.clip(image, np.percentile(image, 1), np.percentile(image, 99))
-                image = (image - np.mean(image)) / (np.std(image) + 1e-5)
+        # Albumentation
+        image = image.astype(np.float32)
+        mask = mask.astype(np.float32)
 
-            # Add channel dimension
-            image = np.expand_dims(image, axis=0)
-            mask = np.expand_dims(mask, axis=0)
+        augmented = self.transform(image=image, mask=mask)
+        image = augmented["image"].unsqueeze(0)   # back to [1,H,W]
+        mask = augmented["mask"].unsqueeze(0)
 
-            image = torch.tensor(image, dtype=torch.float32)
-            mask = torch.tensor(mask, dtype=torch.float32)
+        return image, mask
 
-            # Resize both image and mask to fixed size
-            image = self.resize(image)
-            mask = self.resize(mask)
 
-            if self.transform:
-                image = self.transform(image)
-                mask = self.transform(mask)
-
-            if self.augment:
-                image = self.augmentations(image)
-                mask = self.augmentations(mask)
-
-            return image, mask
-
-# Helper function to create train/val/test datasets
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
     """
     Prepares train/val/test datasets using the actual folder names
-    in kera_slices_data.
+    in keras_slices_data.
     """
-
     train_imgs = os.path.join(base_path, "keras_slices_train")
     train_masks = os.path.join(base_path, "keras_slices_seg_train")
 
@@ -94,18 +88,14 @@ def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data")
     test_masks = os.path.join(base_path, "keras_slices_seg_test")
 
     train_set = HipMRIDataset(train_imgs, train_masks, augment=True)
-    val_set = HipMRIDataset(val_imgs, val_masks)
-    test_set = HipMRIDataset(test_imgs, test_masks)
+    val_set = HipMRIDataset(val_imgs, val_masks, augment=False)
+    test_set = HipMRIDataset(test_imgs, test_masks, augment=False)
 
     return train_set, val_set, test_set
 
+
 if __name__ == "__main__":
-    # Quick test to verify loading works
     train_set, _, _ = get_datasets()
     print(f"Train set size: {len(train_set)} samples")
-
     img, mask = train_set[0]
     print(f"Image shape: {img.shape}, Mask shape: {mask.shape}")
-
-
-
