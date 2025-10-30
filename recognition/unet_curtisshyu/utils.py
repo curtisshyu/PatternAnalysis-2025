@@ -57,13 +57,12 @@ def soft_dice_coefficient(pred, target, epsilon=1e-6):
     return torch.clamp(dice.mean(), 0.0, 1.0)
 
 def dice_loss(pred, target, smooth=1.0):
-    """Stable soft Dice loss that tolerates class imbalance."""
     pred = torch.sigmoid(pred)
     target = torch.clamp(target, 0, 1)
-    intersection = (pred * target).sum(dim=(1, 2, 3))
-    union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
+    intersection = (pred * target).sum()
+    union = pred.sum() + target.sum()
     dice = (2. * intersection + smooth) / (union + smooth)
-    return 1 - dice.mean()
+    return 1 - dice
 
 def dice_coefficient(pred, target, threshold=0.4, epsilon=1e-6):
     """

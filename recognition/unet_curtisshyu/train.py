@@ -70,9 +70,8 @@ def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/un
 
     model = UNet(n_channels=1, n_classes=1).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs, pct_start=0.3
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+
 
     _, params = param_check(model)
     print(f"Model initialized with {params:,} parameters")
@@ -88,18 +87,22 @@ def train_model(epochs, lr, batch_size, bce_ratio=0.4, save_path="recognition/un
             imgs, masks = imgs.to(device), masks.to(device)
             optimizer.zero_grad()
 
-            outputs = model(imgs)
+            # Forward pass
             outputs = model(imgs)
 
-            # simple BCE + Dice combo, no weight map
-            bce = nn.BCEWithLogitsLoss()(outputs, masks)
-            dsc = dice_loss(outputs, masks)
-            loss = bce_ratio * bce + (1 - bce_ratio) * dsc
+            # Compute weight map
+            weight_np = calculate_weight_map(masks.detach().cpu().numpy())
+            weights = torch.tensor(weight_np, device=device, dtype=torch.float32)
 
+            # Weighted BCE + Dice loss
+            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_ratio)
+
+            # Backpropagation
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             scheduler.step()
+
             epoch_loss += loss.item()
 
         avg_train_loss = epoch_loss / len(train_loader)
@@ -187,5 +190,5 @@ def hyperparam_tuning():
 
 
 if __name__ == "__main__":
-    train_model(epochs=80, lr=5e-4, batch_size=2, bce_ratio=0.5)
+    train_model(epochs=40, lr=3e-4, batch_size=2, bce_ratio=0.6)
     test_model("recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)
