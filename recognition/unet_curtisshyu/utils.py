@@ -44,3 +44,11 @@ def plot_training(train_losses, val_dices, save_path="training_curve.png"):
         "train_loss": train_losses,
         "val_dice": val_dices
     }).to_csv(os.path.splitext(save_path)[0] + ".csv", index=False)
+
+def tversky_loss(pred, target, alpha=0.7, beta=0.3, eps=1e-6):
+    pred = torch.sigmoid(pred)
+    tp = (pred * target).sum(dim=(1,2,3))
+    fp = ((1 - target) * pred).sum(dim=(1,2,3))
+    fn = (target * (1 - pred)).sum(dim=(1,2,3))
+    tversky = (tp + eps) / (tp + alpha * fp + beta * fn + eps)
+    return 1 - tversky.mean()

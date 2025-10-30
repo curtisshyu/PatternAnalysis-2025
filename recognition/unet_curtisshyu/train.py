@@ -6,8 +6,9 @@ import torch.optim as optim
 from recognition.unet_curtisshyu.modules import UNet
 from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import bce_dice_loss, soft_dice, hard_dice, plot_training
+from recognition.unet_curtisshyu.utils import tversky_loss
 
-def train_model(epochs=50, lr=3e-4, batch_size=4, bce_weight=0.5):
+def train_model(epochs, lr, batch_size, bce_weight):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Training on device: {device}")
 
@@ -16,6 +17,11 @@ def train_model(epochs=50, lr=3e-4, batch_size=4, bce_weight=0.5):
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
 
     model = UNet(n_channels=1, n_classes=1).to(device)
+    # Load previous best weights
+    ckpt_path = "checkpoints/unet_best.pth"
+    if os.path.exists(ckpt_path):
+        model.load_state_dict(torch.load(ckpt_path, map_location=device))
+        print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     best_val_dice = 0.0
@@ -32,7 +38,7 @@ def train_model(epochs=50, lr=3e-4, batch_size=4, bce_weight=0.5):
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = bce_dice_loss(outputs, masks, bce_weight=bce_weight)
+            loss = tversky_loss(outputs, masks, bce_weight=bce_weight)
             loss.backward()
             optimizer.step()
 
@@ -92,5 +98,5 @@ def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth"):
 
 
 if __name__ == "__main__":
-    train_model()
+    train_model(epochs=50, lr=1e-3, batch_size=8, bce_weight=0.5)
     test_model()
