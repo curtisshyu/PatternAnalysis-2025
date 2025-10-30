@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-from recognition.unet_curtisshyu.modules import train_model, sanity_check
 
 """
 Contains utility functions for U-Net architecture
