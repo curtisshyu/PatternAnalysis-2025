@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import torch
+import torch.nn as nn
+import numpy as np
+from scipy.ndimage import distance_transform_edt
 
 """
 Contains utility functions for U-Net architecture
@@ -56,8 +60,6 @@ def dice_loss(pred, target):
     """Dice loss = 1 - soft Dice."""
     return 1 - soft_dice_coefficient(pred, target)
 
-
-
 def dice_coefficient(pred, target, epsilon=1e-6):
     """
     Hard Dice for evaluation — thresholded at 0.5.
@@ -71,6 +73,49 @@ def dice_coefficient(pred, target, epsilon=1e-6):
     union = pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
     dice = (2. * intersection + epsilon) / (union + epsilon)
     return torch.clamp(dice.mean(), 0.0, 1.0)
+
+def get_class_weights(mask):
+    """
+    Assign higher weight to underrepresented class pixels.
+    """
+    weight = np.zeros(mask.shape)
+    c0 = (mask == 0)
+    c1 = (mask == 1)
+    total = mask.size
+    count_0 = c0.sum()
+    count_1 = c1.sum()
+    if count_1 < 10:  # avoid division by zero
+        return np.ones(mask.shape)
+    weight_0 = total / (2.0 * count_0)
+    weight_1 = total / (2.0 * count_1)
+    weight += weight_0 * c0 + weight_1 * c1
+    return weight
+
+def weight_map(mask, w0=10, sigma=5):
+    """
+    Create a distance-based weight map that penalizes boundary pixels more.
+    """
+    mask = mask.astype(np.uint8)
+    dist = distance_transform_edt(1 - mask) + distance_transform_edt(mask)
+    w = w0 * np.exp(- (dist ** 2) / (2 * (sigma ** 2)))
+    wc = get_class_weights(mask)
+    return wc + w
+
+def calculate_weight_map(masks: np.ndarray):
+    weights = []
+    for m in np.squeeze(masks):
+        weights.append(weight_map(m))
+    return np.array(weights)
+
+
+def weighted_bce_dice_loss(pred, target, weights):
+    """
+    Combines weighted BCE and Dice.
+    """
+    bce = nn.BCELoss(reduction='none')(pred, target)
+    weighted_bce = (bce * weights).mean()
+    dice = 1 - soft_dice_coefficient(pred, target)
+    return weighted_bce + dice
 
 def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_curtisshyu/checkpoints/training_curve.png"):
     import matplotlib.pyplot as plt, pandas as pd, os
@@ -100,6 +145,5 @@ def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_cu
         "train_loss": train_losses,
         "val_dice": val_dices
     }).to_csv(os.path.splitext(save_path)[0] + "_log.csv", index=False)
-
 
 
