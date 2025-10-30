@@ -46,31 +46,45 @@ class HipMRIDataset(Dataset):
     def __len__(self):
         return len(self.image_files)
 
-    def __getitem__(self, idx):
-        image_path = os.path.join(self.image_dir, self.image_files[idx])
-        mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+def __getitem__(self, idx):
+    image_path = os.path.join(self.image_dir, self.image_files[idx])
+    mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
 
-        image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
-        mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
+    # Load 2D slices directly
+    image = nib.load(image_path).get_fdata(dtype=np.float32)
+    mask = nib.load(mask_path).get_fdata(dtype=np.float32)
 
-        # Normalize mask to 0–1
-        if mask.max() > 1.0:
-            mask = mask / mask.max()
+    # Squeeze any singleton dimensions (H, W, 1) → (H, W)
+    image = np.squeeze(image)
+    mask = np.squeeze(mask)
 
-        # Clip + normalize image
-        if self.normalize:
-            image = np.clip(image, np.percentile(image, 1), np.percentile(image, 99))
-            image = (image - np.mean(image)) / (np.std(image) + 1e-5)
+    # Ensure mask is binary (0 or 1)
+    mask = (mask > 0).astype(np.float32)
 
-        # Albumentation
-        image = image.astype(np.float32)
-        mask = mask.astype(np.float32)
-        augmented = self.transform(image=image, mask=mask)
-        image = augmented["image"]
-        mask = augmented["mask"].unsqueeze(0) if augmented["mask"].ndim == 2 else augmented["mask"]
+    # Debug: Check for empty masks (critical for training)
+    if np.sum(mask) == 0:
+        print(f"EMPTY MASK: {self.mask_files[idx]} - this may hurt training")
 
+    # Normalize image
+    if self.normalize:
+        # Robust normalization - clip outliers
+        p1, p99 = np.percentile(image, [1, 99])
+        image = np.clip(image, p1, p99)
+        
+        # Z-score normalization
+        mean = np.mean(image)
+        std = np.std(image)
+        if std > 1e-6:
+            image = (image - mean) / std
+        else:
+            image = image - mean
 
-        return image, mask
+    # Apply augmentations
+    augmented = self.transform(image=image, mask=mask)
+    image = augmented["image"]
+    mask = augmented["mask"].unsqueeze(0)  # Add channel dimension: (1, H, W)
+    
+    return image, mask
 
 
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
