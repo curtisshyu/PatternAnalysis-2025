@@ -38,7 +38,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = tversky_loss(outputs, masks, bce_weight=bce_weight)
+            loss = tversky_loss(outputs, masks)
             loss.backward()
             optimizer.step()
 
