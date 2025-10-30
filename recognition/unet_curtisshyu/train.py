@@ -112,7 +112,7 @@ def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, sav
                 imgs, masks = imgs.to(device), masks.to(device)
                 outputs = model(imgs)
                 batch_dice = dice_coefficient(outputs, masks)
-                val_dices.append(batch_dice.item())
+                val_dices_epoch.append(batch_dice.item())
         
         avg_val_dice = sum(val_dices_epoch) / len(val_dices_epoch)
         train_losses.append(avg_train_loss)
