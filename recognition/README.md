@@ -72,6 +72,10 @@ Allows us to escape plateaus
 - factor is how much to reduce by
 - patience is count wihtout improvement to reduce
 
+## Hyperparam tuning
+- lightweight grid search function toe xplore combination of learning rates, BCE dice loss weights
+
+
 dataset.py
 - justify the transforms augmentation
 - mimic realsitic mri variablity

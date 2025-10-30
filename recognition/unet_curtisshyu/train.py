@@ -57,7 +57,7 @@ def sanity_check(device="cuda" if torch.cuda.is_available() else "cpu"):
 """
 Training Skeleton
 """
-def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
+def train_model(epochs, lr, batch_size, bce_weight = 0.3, dice_weight = 0.7, save_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth"):
     """
      Trains U-Net model on the dataset for a number of epochs
     """
@@ -94,7 +94,7 @@ def train_model(epochs, lr, batch_size, save_path="recognition/unet_curtisshyu/c
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            loss = 0.3 * bce_loss(outputs, masks) + 0.7 * dice_loss(outputs, masks)
+            loss = bce_weight * bce_loss(outputs, masks) + dice_weight * dice_loss(outputs, masks)
             loss.backward()
             optimizer.step()
 
@@ -161,7 +161,37 @@ def test_model(checkpoint_path,
     print(f"\nTest Dice Coefficient on unseen test set: {avg_dice:.4f}")
     return avg_dice
 
+def hyperparam_tuning():
+    """
+    Runs a small grid search over learning rate and BCE/Dice loss weight combinations.
+    Each configuration trains for 25 epochs and logs its validation Dice performance.
+
+    Used to determine the best hyperparameters before long-run training.
+    """
+
+    configs = [
+        {"lr": 1e-3, "bce_weight": 0.3, "dice_weight": 0.7},
+        {"lr": 5e-4, "bce_weight": 0.5, "dice_weight": 0.5},
+        {"lr": 2e-4, "bce_weight": 0.7, "dice_weight": 0.3},
+    ]
+
+    for cfg in configs:
+        print("=" * 70)
+        print(f"Running config → LR: {cfg['lr']}, BCE: {cfg['bce_weight']}, DICE: {cfg['dice_weight']}")
+        print("=" * 70)
+
+        # Call training loop with custom loss weights
+        model = train_model(
+            epochs=25,
+            lr=cfg["lr"],
+            batch_size=4,
+            bce_weight=cfg["bce_weight"],
+            dice_weight=cfg["dice_weight"],
+        )
+
+    print("\nHyperparameter tuning completed. Compare validation curves or Dice scores to select best combo.")
+
 
 if __name__ == "__main__":
     train_model(epochs=75, lr=5e-4, batch_size=4)
-    test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2)   
+    test_model(checkpoint_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", batch_size=2) 

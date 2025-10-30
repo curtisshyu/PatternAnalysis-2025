@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from recognition.unet_curtisshyu.modules import train_model, sanity_check
+
 """
 Contains utility functions for U-Net architecture
 - Dice Coefficient
@@ -99,4 +101,6 @@ def plot_training_curves(train_losses, val_dices, save_path="recognition/unet_cu
         "train_loss": train_losses,
         "val_dice": val_dices
     }).to_csv(os.path.splitext(save_path)[0] + "_log.csv", index=False)
+
+
 
