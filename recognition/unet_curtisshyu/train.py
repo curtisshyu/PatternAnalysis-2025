@@ -20,10 +20,10 @@ def train_model(epochs, lr, batch_size, bce_weight):
 
     model = UNet(n_channels=1, n_classes=1).to(device)
     # Load previous best weights
-    ckpt_path = "checkpoints/unet_best.pth"
-    if os.path.exists(ckpt_path):
-        model.load_state_dict(torch.load(ckpt_path, map_location=device))
-        print("Loaded pretrained weights for fine-tuning.")
+    #ckpt_path = "checkpoints/unet_best.pth"
+    #if os.path.exists(ckpt_path):
+       # model.load_state_dict(torch.load(ckpt_path, map_location=device))
+        #print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # Polynomial Scheduler
     scheduler = torch.optim.lr_scheduler.PolynomialLR(
