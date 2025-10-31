@@ -79,8 +79,14 @@ def calculate_weight_map(masks, w0=10, sigma=5):
         mask = masks[i, 0]
         dist_fore = cv2.distanceTransform((mask > 0).astype(np.uint8), cv2.DIST_L2, 3)
         dist_back = cv2.distanceTransform((mask == 0).astype(np.uint8), cv2.DIST_L2, 3)
-        weights[i, 0] = w0 * np.exp(-((dist_fore + dist_back) ** 2) / (2 * sigma ** 2))
+        d = dist_fore + dist_back
+
+        # Clamp very large distance values to avoid overflow
+        d = np.clip(d, 0, 255)
+
+        weights[i, 0] = w0 * np.exp(- (d ** 2) / (2 * sigma ** 2))
     return weights
+
 
 def weighted_bce_dice_loss(pred, target, weight_map, bce_ratio=0.5, eps=1e-6):
     """
