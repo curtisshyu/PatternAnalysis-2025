@@ -64,7 +64,12 @@ class HipMRIDataset(Dataset):
         image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
         mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
         # Keep only prostate class
-        mask = mask.astype(np.int64)
+        mask = (mask == 3).astype(np.float32)
+
+
+        # Normalize mask to 0–1
+        #if mask.max() > 1.0:
+            #mask = mask / mask.max()
 
         # Clip + normalize image
         if self.normalize:
@@ -72,14 +77,16 @@ class HipMRIDataset(Dataset):
             image = (image - np.mean(image)) / (np.std(image) + 1e-5)
 
         # Albumentation
-# Convert mask to integer class labels
-        mask = mask.astype(np.int64)
-
+        image = image.astype(np.float32)
+        mask = mask.astype(np.float32)
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
-        mask = augmented["mask"].long()   # ensure integer labels
+        mask = augmented["mask"]
 
+        if mask.ndim == 2:      # (H, W)
+            mask = mask.unsqueeze(0)
         return image, mask
+
 
 
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
