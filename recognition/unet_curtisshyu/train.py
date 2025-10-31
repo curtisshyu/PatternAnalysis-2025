@@ -7,6 +7,20 @@ from recognition.unet_curtisshyu.modules import UNet
 from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import hard_dice, plot_training
 
+import torch
+import torch.backends.cudnn as cudnn
+import gc, os, sys
+
+
+torch.cuda.empty_cache()
+gc.collect()
+
+
+torch.backends.cudnn.enabled = False
+cudnn.benchmark = False
+cudnn.deterministic = True
+
+
 
 def train_model(epochs, lr, batch_size, bce_weight=0.5):
     device = "cuda" if torch.cuda.is_available() else "cpu"
