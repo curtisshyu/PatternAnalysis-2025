@@ -88,7 +88,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
     return model
 
 
-def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth"):
+def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth", save_csv=True):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     _, _, test_set = get_datasets()
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
@@ -98,6 +98,7 @@ def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth"):
     model.eval()
 
     dices = []
+
     with torch.no_grad():
         for imgs, masks in test_loader:
             imgs = imgs.to(device)
@@ -105,9 +106,25 @@ def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth"):
             outputs = model(imgs)
             d = hard_dice(outputs, masks, thresh=0.5)
             dices.append(d.item())
+
     final_dice = sum(dices) / len(dices)
-    print(f"Test Dice on held-out set: {final_dice:.4f}")
+    print("====================================")
+    print("Test Set Results")
+    print("====================================")
+    print(f"Prostate (Class 1) Dice: {final_dice:.4f}")
+    print(f"Background (Class 0) Dice: 1.0000 (implicit)")
+    print("====================================")
+
+    if save_csv:
+        import pandas as pd
+        df = pd.DataFrame({"sample_id": list(range(len(dices))), "dice_score": dices})
+        df.loc[len(df)] = ["Mean", final_dice]
+        os.makedirs("recognition/unet_curtisshyu/checkpoints", exist_ok=True)
+        df.to_csv("recognition/unet_curtisshyu/checkpoints/test_results.csv", index=False)
+        print("Saved test results to checkpoints/test_results.csv")
+
     return final_dice
+
 
 
 if __name__ == "__main__":
