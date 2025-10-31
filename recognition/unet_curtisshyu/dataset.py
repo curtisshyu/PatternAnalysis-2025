@@ -49,6 +49,17 @@ class HipMRIDataset(Dataset):
     def __getitem__(self, idx):
         image_path = os.path.join(self.image_dir, self.image_files[idx])
         mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+        
+        # Load both NIfTI volumes
+        img_nii = nib.load(image_path)
+        mask_nii = nib.load(mask_path)
+
+        # Check spatial alignment
+        if not np.allclose(img_nii.affine, mask_nii.affine):
+            print(f"[WARNING] Affine mismatch: {self.image_files[idx]}")
+            print("Image affine:\n", img_nii.affine)
+            print("Mask affine:\n", mask_nii.affine)
+
 
         image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
         mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
