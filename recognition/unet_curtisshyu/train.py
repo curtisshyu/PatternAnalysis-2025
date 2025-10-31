@@ -27,7 +27,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
     optimizer, mode='max', factor=0.5, patience=5
 )
 
-    pos_weight = torch.tensor([3.0]).to(device)  
+    pos_weight = torch.tensor([4.0]).to(device)  
 
     best_val_dice = 0.0
     train_losses = []
