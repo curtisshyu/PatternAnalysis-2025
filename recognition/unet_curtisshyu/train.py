@@ -23,6 +23,9 @@ def train_model(epochs, lr, batch_size, bce_weight):
         model.load_state_dict(torch.load(ckpt_path, map_location=device))
         print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode='max', factor=0.5, patience=5, verbose=True
+)
 
     pos_weight = torch.tensor([3.0]).to(device)  
 
@@ -71,7 +74,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
             os.makedirs("checkpoints", exist_ok=True)
             torch.save(model.state_dict(), "checkpoints/unet_best.pth")
             print(f"  → saved new best model (dice={best_val_dice:.4f})")
-
+        scheduler.step(avg_val_dice)
     # plot
     plot_training(train_losses, val_dices, save_path="checkpoints/training_curve.png")
     return model
