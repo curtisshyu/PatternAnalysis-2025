@@ -20,7 +20,7 @@ from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import hard_dice
 from recognition.unet_curtisshyu.train import test_model
 
-def visualize_prediction(model_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", idx=5):
+def visualize_prediction(model_path="checkpoints/unet_best.pth", idx=5):
     """
     Generates a visual comparison between the ground-truth segmentation mask and 
     the predicted mask produced by the trained U-Net model on a selected test sample.
