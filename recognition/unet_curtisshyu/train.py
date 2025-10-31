@@ -24,7 +24,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
         print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='max', factor=0.5, patience=5, verbose=True
+    optimizer, mode='max', factor=0.5, patience=5
 )
 
     pos_weight = torch.tensor([3.0]).to(device)  
