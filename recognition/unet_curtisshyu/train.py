@@ -50,7 +50,8 @@ def train_model(epochs, lr, batch_size, bce_weight):
             weights = torch.tensor(weight_np, device=device, dtype=torch.float32)
 
             outputs = model(imgs)
-            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_weight)
+            loss = bce_dice_loss(outputs, masks, bce_weight=bce_weight, pos_weight=pos_weight)
+
             loss.backward()
             optimizer.step()
 
