@@ -3,6 +3,8 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+import numpy as np
+
 
 def soft_dice(pred, target, eps=1e-6):
     # pred: logits
@@ -63,3 +65,32 @@ def tversky_loss(pred, target, alpha=0.7, beta=0.3, eps=1e-6):
     fn = (target * (1 - pred)).sum(dim=(1,2,3))
     tversky = (tp + eps) / (tp + alpha * fp + beta * fn + eps)
     return 1 - tversky.mean()
+
+
+def calculate_weight_map(masks, w0=10, sigma=5):
+    """
+    Compute spatial weight maps to emphasize object borders.
+    masks: numpy array of shape (B, 1, H, W)
+    Returns weight maps of same shape.
+    """
+    import cv2
+    weights = np.zeros_like(masks, dtype=np.float32)
+    for i in range(masks.shape[0]):
+        mask = masks[i, 0]
+        dist_fore = cv2.distanceTransform((mask > 0).astype(np.uint8), cv2.DIST_L2, 3)
+        dist_back = cv2.distanceTransform((mask == 0).astype(np.uint8), cv2.DIST_L2, 3)
+        weights[i, 0] = w0 * np.exp(-((dist_fore + dist_back) ** 2) / (2 * sigma ** 2))
+    return weights
+
+def weighted_bce_dice_loss(pred, target, weight_map, bce_ratio=0.5, eps=1e-6):
+    """
+    Weighted BCE + Dice loss that down-weights background and boosts boundary regions.
+    weight_map : torch.Tensor of same shape as target
+    """
+    pred_sig = torch.sigmoid(pred)
+    bce = -(weight_map * (target * torch.log(pred_sig + eps) +
+                          (1 - target) * torch.log(1 - pred_sig + eps))).mean()
+    inter = (weight_map * pred_sig * target).sum(dim=(1,2,3))
+    denom = (weight_map * (pred_sig + target)).sum(dim=(1,2,3))
+    dice = (2 * inter + eps) / (denom + eps)
+    return bce_ratio * bce + (1 - bce_ratio) * (1 - dice.mean())

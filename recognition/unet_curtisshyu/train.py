@@ -7,6 +7,8 @@ from recognition.unet_curtisshyu.modules import UNet
 from recognition.unet_curtisshyu.dataset import get_datasets
 from recognition.unet_curtisshyu.utils import bce_dice_loss, soft_dice, hard_dice, plot_training
 from recognition.unet_curtisshyu.utils import tversky_loss
+from recognition.unet_curtisshyu.utils import calculate_weight_map
+from recognition.unet_curtisshyu.utils import weighted_bce_dice_loss
 
 def train_model(epochs, lr, batch_size, bce_weight):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -23,9 +25,10 @@ def train_model(epochs, lr, batch_size, bce_weight):
         model.load_state_dict(torch.load(ckpt_path, map_location=device))
         print("Loaded pretrained weights for fine-tuning.")
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='max', factor=0.5, patience=5
-)
+    # Polynomial Scheduler
+    scheduler = torch.optim.lr_scheduler.PolynomialLR(
+            optimizer, total_iters=epochs, power=0.9
+        )
 
     pos_weight = torch.tensor([4.0]).to(device)  
 
@@ -42,8 +45,12 @@ def train_model(epochs, lr, batch_size, bce_weight):
             masks = masks.to(device)
 
             optimizer.zero_grad()
+
+            weight_np = calculate_weight_map(masks.detach().cpu().numpy())
+            weights = torch.tensor(weight_np, device=device, dtype=torch.float32)
+
             outputs = model(imgs)
-            loss = bce_dice_loss(outputs, masks, bce_weight=bce_weight, pos_weight=pos_weight)
+            loss = weighted_bce_dice_loss(outputs, masks, weights, bce_ratio=bce_weight)
             loss.backward()
             optimizer.step()
 
@@ -62,7 +69,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
                 d = hard_dice(outputs, masks, thresh=0.5)
                 dices.append(d.item())
         avg_val_dice = sum(dices) / len(dices)
-
+        scheduler.step()
         print(f"Epoch [{epoch}/{epochs}] - loss: {avg_train_loss:.4f} - val dice: {avg_val_dice:.4f}")
 
         train_losses.append(avg_train_loss)
@@ -74,7 +81,7 @@ def train_model(epochs, lr, batch_size, bce_weight):
             os.makedirs("checkpoints", exist_ok=True)
             torch.save(model.state_dict(), "checkpoints/unet_best.pth")
             print(f"  → saved new best model (dice={best_val_dice:.4f})")
-        scheduler.step(avg_val_dice)
+
     # plot
     plot_training(train_losses, val_dices, save_path="checkpoints/training_curve.png")
     return model
