@@ -17,8 +17,11 @@ It captures both **low-level spatial features** and **high-level semantic featur
 - **Decoder:** Upsampling via bilinear interpolation + concatenation with encoder features
 - **Output Layer:** 1×1 convolution → single-channel sigmoid mask prediction
 
-## Visualisation
-- TO COMPLETE
+### Binary Segmentation
+- Although the dataset contains four classes (0, 1, 2, 3), only the label 3 corresponds to the prostate gland.
+- The other labels represent surrounding anatomy (e.g., rectum, bladder) or background that are not relevant for the task’s evaluation metric (Dice for prostate segmentation).
+- Therefore, the problem was simplified to binary segmentation: Class 1 = prostate, class 0 = everything else
+- Implemented via mask = (mask == 3).astype(np.float32)
 
 ## How it works
 
@@ -29,11 +32,12 @@ It captures both **low-level spatial features** and **high-level semantic featur
    - Spatial Augmentation (random flipping and transformations) are applied to increase robustness to orientaiton and variability in MRI scans
 
 2. **Training:**  
-   - Uses a spatially weighted BCE + Dice loss to address foreground–background imbalance in prostate segmentation.
+   - The loss uses a Binary Cross Entroy and Dice loss to ensure stable pixel gradients, and optimise overlaps between predicted and ground truth
    - The Weighted BCE term incorporates per-pixel weighting derived from distance transforms, giving higher importance to prostate boundaries and reducing background dominance.
    - The Dice component enforces region-level overlap accuracy.
    - Optimizer: **Adam** with learning rate `1e-3`  
-   - Batch size: 8, 25 epochs  
+   - Batch size: 8, 50 epochs  
+   - BCE_Weight = 0.5
    - Validation Dice used to save the best-performing model.
    - Training Curves plotted to examine behviour
    - Polynomial learning-rate decay (power = 0.9) for smooth, monotonic LR reduction—improving stability and preventing stagnation.
@@ -43,6 +47,8 @@ It captures both **low-level spatial features** and **high-level semantic featur
    - Performance measured using the **Dice Similarity Coefficient (DSC)** on the held-out test set.  
    - Qualitative evaluation includes overlaying predicted segmentation masks on MRI slices.
 
+## Visualisation
+- TO COMPLETE
 
 ## Dataset
 
@@ -57,7 +63,9 @@ Data sets are splot as follows
 --- 
 
 ## Example Usage
-- TO COMPLETE
+- To train the model run python -m recognition.unet_curtisshyu.train
+- To Generate visualisationsand make predictions python -m recognition.unet_curtisshyu.predict
+- All results are saved down to recognition/unet_curtisshyu/checkpoints/
 
 ## Reproducibility
 - No Random seeds to consider fixed across the codebase
@@ -74,8 +82,11 @@ matplotlib
 numpy
 nibabel
 albumentations
+os
+sys
 
 Install via:
 
 ```bash
-pip install pandas
+pip install torch pandas matplotlib numpy nibabel albumentations os sys
+

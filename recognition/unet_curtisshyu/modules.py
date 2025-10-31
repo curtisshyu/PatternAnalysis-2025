@@ -1,8 +1,15 @@
 """
-Defines the 2D U-Net model architecture for prostate MRI segmentation.
+modules.py
+Implements the 2D U-Net architecture used for automatic prostate segmentation.
 
-Implements a fully convolutional encoder–decoder structure with skip connections.
-Each block includes convolution, batch normalization, and ReLU activation.
+Components:
+- DoubleConv: Two sequential Conv2D → BatchNorm → ReLU operations.
+- Down: Encoder block performing MaxPooling followed by DoubleConv.
+- Up: Decoder block performing upsampling and skip connection concatenation.
+- OutConv: 1×1 convolution to project features to segmentation logits.
+- UNet: Full encoder–decoder architecture with symmetric skip connections.
+
+Used by: train.py, predict.py
 """
 
 import torch
@@ -10,10 +17,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Basic building block (Conv → BN → ReLU)
-"""
-Two convolutional laters each followed by batch and relu 
-Eacch block learns increasingly complex features (edges, tissues, intensity gradients)
-"""
 class DoubleConv(nn.Module):
     """[Conv2d → BatchNorm → ReLU] × 2"""
     def __init__(self, in_channels, out_channels):

@@ -1,17 +1,39 @@
+"""
+dataset.py
+Defines the HipMRIDataset class for loading, preprocessing, and augmenting 2D MRI slices
+from the HipMRI Prostate Study dataset.
+
+Key Responsibilities:
+- Loads `.nii` or `.nii.gz` MRI images and segmentation masks.
+- Applies normalisation, clipping, and data augmentation using Albumentations.
+- Ensures synchronised transformation of image–mask pairs.
+- Provides PyTorch Dataset objects for training, validation, and testing splits.
+
+Used by: train.py, predict.py
+"""
+
 import os
 import numpy as np
 import nibabel as nib
-import torch
 from torch.utils.data import Dataset
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
 class HipMRIDataset(Dataset):
     """
     Loads 2D MRI slice images and corresponding segmentation masks 
     for prostate segmentation using the HipMRI dataset.
     """
     def __init__(self, image_dir, mask_dir, normalize=True, target_size=(256, 256), augment=False):
+        """
+        Initialises the dataset.
+
+        Parameters:
+        - image_dir: Directory containing MRI slice images in NIfTI format.
+        - mask_dir: Directory containing segmentation masks in NIfTI format.
+        - normalise: Whether to normalize image intensities.
+        - target_size: Tuple specifying the (height, width) to resize images and masks.
+        - augment: Whether to apply data augmentation.
+        """
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.normalize = normalize
@@ -19,6 +41,8 @@ class HipMRIDataset(Dataset):
         self.augment = augment
 
         # Albumentations transform (synchronised image-mask aug)
+        # Applied to both the MRI image and its segmentation mask
+        # Increases generalisation
         if augment:
             self.transform = A.Compose([
                 A.HorizontalFlip(p=0.5),
@@ -44,9 +68,21 @@ class HipMRIDataset(Dataset):
             f"Number of images ({len(self.image_files)}) and masks ({len(self.mask_files)}) must match."
 
     def __len__(self):
+        """
+        Returns the number of samples in the dataset.
+        """
         return len(self.image_files)
 
     def __getitem__(self, idx):
+        """
+        Loads and processes one image-mask pair.
+
+        Parameters:
+        - idx: Index of the sample to retrieve.
+
+        returns:
+        - image: Processed image tensor.
+        """
         image_path = os.path.join(self.image_dir, self.image_files[idx])
         mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
         
@@ -66,11 +102,6 @@ class HipMRIDataset(Dataset):
         # Keep only prostate class
         mask = (mask == 3).astype(np.float32)
 
-
-        # Normalize mask to 0–1
-        #if mask.max() > 1.0:
-            #mask = mask / mask.max()
-
         # Clip + normalize image
         if self.normalize:
             image = np.clip(image, np.percentile(image, 1), np.percentile(image, 99))
@@ -87,12 +118,16 @@ class HipMRIDataset(Dataset):
             mask = mask.unsqueeze(0)
         return image, mask
 
-
-
 def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data"):
     """
     Prepares train/val/test datasets using the actual folder names
     in keras_slices_data.
+
+    parameters:
+    - base_path: Base directory containing the dataset folders.
+
+    returns:
+    - train_set, val_set, test_set: Dataset objects for training, validation, and testing used in model training and evaluation.
     """
     train_imgs = os.path.join(base_path, "keras_slices_train")
     train_masks = os.path.join(base_path, "keras_slices_seg_train")
@@ -108,13 +143,6 @@ def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data")
     test_set = HipMRIDataset(test_imgs, test_masks, augment=False)
 
     return train_set, val_set, test_set
-
-import numpy as np, nibabel as nib
-
-#m = nib.load("recognition/unet_curtisshyu/data/keras_slices_data/keras_slices_seg_train/seg_004_week_0_slice_0.nii.gz").get_fdata()
-#print(np.unique(m))
-
-
 
 if __name__ == "__main__":
     train_set, _, _ = get_datasets()

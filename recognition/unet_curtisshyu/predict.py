@@ -1,3 +1,18 @@
+"""
+predict.py
+Performs inference and visualization of model predictions on unseen MRI test images.
+
+Functions:
+- visualize_prediction(): Loads a trained model and overlays predicted masks on input MRI slices.
+- Optionally calls test_model() for quantitative Dice evaluation on the test set.
+
+Outputs:
+- Example overlay visualizations saved to `checkpoints/prediction_example.png`.
+- Console output of Dice score for selected test slice.
+
+Used for qualitative and quantitative validation of segmentation performance.
+"""
+
 import torch
 import matplotlib.pyplot as plt
 from recognition.unet_curtisshyu.modules import UNet
@@ -6,6 +21,17 @@ from recognition.unet_curtisshyu.utils import hard_dice
 from recognition.unet_curtisshyu.train import test_model
 
 def visualize_prediction(model_path="recognition/unet_curtisshyu/checkpoints/unet_best.pth", idx=5):
+    """
+    Generates a visual comparison between the ground-truth segmentation mask and 
+    the predicted mask produced by the trained U-Net model on a selected test sample.
+
+    Parameters:
+    - model_path: Path to the trained U-Net model weights.
+    - idx: Index of the test sample to visualize.
+
+    returns:
+    - None (saves and shows the plot)
+    """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     _, _, test_set = get_datasets()
     
