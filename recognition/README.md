@@ -29,11 +29,15 @@ It captures both **low-level spatial features** and **high-level semantic featur
    - Spatial Augmentation (random flipping and transformations) are applied to increase robustness to orientaiton and variability in MRI scans
 
 2. **Training:**  
-   - Uses the **Tversky loss** (α=0.7, β=0.3) to handle strong class imbalance between prostate and background pixels.  
+   - Uses a spatially weighted BCE + Dice loss to address foreground–background imbalance in prostate segmentation.
+   - The Weighted BCE term incorporates per-pixel weighting derived from distance transforms, giving higher importance to prostate boundaries and reducing background dominance.
+   - The Dice component enforces region-level overlap accuracy.
    - Optimizer: **Adam** with learning rate `1e-3`  
-   - Batch size: 4, 50 epochs  
+   - Batch size: 8, 25 epochs  
    - Validation Dice used to save the best-performing model.
    - Training Curves plotted to examine behviour
+   - Polynomial learning-rate decay (power = 0.9) for smooth, monotonic LR reduction—improving stability and preventing stagnation.
+   - checkpoint to save current weights
 
 3. **Evaluation:**  
    - Performance measured using the **Dice Similarity Coefficient (DSC)** on the held-out test set.  
