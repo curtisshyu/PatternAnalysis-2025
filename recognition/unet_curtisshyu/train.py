@@ -103,5 +103,5 @@ def test_model(batch_size=4, ckpt_path="checkpoints/unet_best.pth"):
 
 
 if __name__ == "__main__":
-    train_model(epochs=50, lr=1e-3, batch_size=8, bce_weight=0.5)
+    train_model(epochs=25, lr=1e-3, batch_size=8, bce_weight=0.5)
     test_model()
