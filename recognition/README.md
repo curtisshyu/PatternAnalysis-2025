@@ -48,7 +48,7 @@ It captures both **low-level spatial features** and **high-level semantic featur
    - Qualitative evaluation includes overlaying predicted segmentation masks on MRI slices.
 
 ## Visualisation
-- TO COMPLETE
+- Figure 1: Comparison of input MRI (left), ground truth, predicted mask overlay ![Training Curve](recognition/unet_curtisshyu/checkpoints/training_curve.png)
 
 ## Dataset
 
