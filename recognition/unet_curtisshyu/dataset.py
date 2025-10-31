@@ -63,10 +63,13 @@ class HipMRIDataset(Dataset):
 
         image = nib.load(image_path).get_fdata(caching='unchanged').astype(np.float32)
         mask = nib.load(mask_path).get_fdata(caching='unchanged').astype(np.float32)
+        # Keep only prostate class
+        mask = (mask == 3).astype(np.float32)
+
 
         # Normalize mask to 0–1
-        if mask.max() > 1.0:
-            mask = mask / mask.max()
+        #if mask.max() > 1.0:
+            #mask = mask / mask.max()
 
         # Clip + normalize image
         if self.normalize:
@@ -105,6 +108,12 @@ def get_datasets(base_path="recognition/unet_curtisshyu/data/keras_slices_data")
     test_set = HipMRIDataset(test_imgs, test_masks, augment=False)
 
     return train_set, val_set, test_set
+
+import numpy as np, nibabel as nib
+
+#m = nib.load("recognition/unet_curtisshyu/data/keras_slices_data/keras_slices_seg_train/seg_004_week_0_slice_0.nii.gz").get_fdata()
+#print(np.unique(m))
+
 
 
 if __name__ == "__main__":
